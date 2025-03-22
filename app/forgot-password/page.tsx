@@ -54,11 +54,31 @@ export default function ForgotPasswordPage() {
       return
     }
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
+    
+    try {
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Password Reset failed!')
+      }
     router.push('/login')
   }
+  catch (error) {
+    if (error instanceof Error) {
+      alert(error.message || 'Something went wrong!')
+    } else {
+      alert('Something went wrong!')
+    }
+  } finally {
+    setIsLoading(false)
+  }
+}
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/
   const isPasswordValid = passwordRegex.test(password)

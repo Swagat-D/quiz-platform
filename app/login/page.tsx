@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { signIn } from "next-auth/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowLeft, Code, Moon, Sun } from 'lucide-react'
@@ -37,12 +38,30 @@ export default function LoginPage() {
   })
 
   const onSubmit = async (data: FormData) => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsLoading(false)
-    router.push('/dashboard')
-  }
+    setIsLoading(true);
+
+    try {
+      const result = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        throw new Error("Invalid credentials")
+      }
+    router.push('/dashboard');
+    }
+    catch (error) {
+      if (error instanceof Error) {
+        alert(error.message || "Login Failed");
+      } else {
+        alert("Login Failed");
+      }
+    }finally {
+      setIsLoading(false)
+    }
+  };
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode)

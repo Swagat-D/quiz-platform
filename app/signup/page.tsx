@@ -38,14 +38,39 @@ export default function SignUpPage() {
     e.preventDefault()
     if (!isPasswordValid) {
       alert("Please ensure your password meets the requirements.")
-      return
+      return;
     }
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    setStep('verify')
-  }
+    setIsLoading(true);
+
+    try{
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+    }
+
+    setStep('verify');
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Something went wrong');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleVerifyOTP = async (otp: string) => {
     setIsLoading(true)
