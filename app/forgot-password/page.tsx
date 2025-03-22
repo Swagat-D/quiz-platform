@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Code, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Code, Eye, EyeOff, Verified } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -33,18 +33,67 @@ export default function ForgotPasswordPage() {
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    setStep('otp')
+    
+    try {
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          type: 'reset'
+        }),
+      });
+  
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
+      }
+  
+      setStep('otp');
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Something went wrong');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const handleVerifyOTP = async (otp: string) => {
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    setStep('password')
+    
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          otp,
+          type: 'reset'
+        }),
+      });
+  
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification failed');
+      }
+  
+      setStep('password');
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Something went wrong');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -59,7 +108,7 @@ export default function ForgotPasswordPage() {
       const response = await fetch('/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, Verified: true })
       })
 
       const data = await response.json()
@@ -216,7 +265,7 @@ export default function ForgotPasswordPage() {
                       </Button>
                     </div>
                     {password && confirmPassword && password !== confirmPassword && (
-                      <p className="text-sm text-red-500">Passwords don't match.</p>
+                      <p className="text-sm text-red-500">Passwords don&#39;t match.</p>
                     )}
                   </div>
                   <Button

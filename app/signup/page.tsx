@@ -41,26 +41,23 @@ export default function SignUpPage() {
       return;
     }
     setIsLoading(true);
-
-    try{
-      const response = await fetch('/api/register', {
+  
+    try {
+      // First register the user
+      const registerResponse = await fetch('/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify(formData),
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
-    }
-
-    setStep('verify');
+  
+      const registerData = await registerResponse.json();
+      if (!registerResponse.ok) {
+        throw new Error(registerData.error || 'Registration failed');
+      }
+  
+      setStep('verify');
     } catch (error) {
       if (error instanceof Error) {
         alert(error.message);
@@ -74,11 +71,36 @@ export default function SignUpPage() {
 
   const handleVerifyOTP = async (otp: string) => {
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    // Redirect to login page instead of dashboard
-    router.push('/login')
+    
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          otp,
+          type: 'signup'
+        }),
+      });
+  
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification failed');
+      }
+  
+      // Successful verification, redirect to login
+      router.push('/login');
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Something went wrong');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (

@@ -4,7 +4,15 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
+    const { email, password, verified } = await req.json();
+    
+    // Only allow password reset if OTP verification was successful
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Email verification required" },
+        { status: 400 }
+      );
+    }
     
     const user = await prisma.user.findUnique({
       where: { email }

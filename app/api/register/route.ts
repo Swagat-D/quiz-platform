@@ -1,6 +1,9 @@
+// app/api/register/route.ts
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { saveOTP } from "@/lib/otp-service";
+import { sendOTPEmail } from "@/lib/email-service";
 
 export async function POST(req: Request) {
   try {
@@ -21,14 +24,21 @@ export async function POST(req: Request) {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create the user
+    // Create the user (unverified)
     const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
+        emailVerified: false,
       },
     });
+
+    // Generate and save OTP
+    const otp = await saveOTP(email, 'signup');
+    
+    // Send OTP email
+    await sendOTPEmail(email, otp, 'signup');
 
     return NextResponse.json(
       { 
@@ -37,7 +47,7 @@ export async function POST(req: Request) {
           name: user.name, 
           email: user.email 
         },
-        message: "Registration successful" 
+        message: "Registration initiated. Please verify your email." 
       },
       { status: 201 }
     );
