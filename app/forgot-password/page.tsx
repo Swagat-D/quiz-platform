@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Code, Eye, EyeOff, Verified } from 'lucide-react'
+import { ArrowLeft, Code, Eye, EyeOff, verified } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
       const response = await fetch('/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, Verified: true })
+        body: JSON.stringify({ email, password, verified: true })
       })
 
       const data = await response.json()

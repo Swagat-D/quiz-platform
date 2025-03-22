@@ -50,7 +50,9 @@ export default function LoginPage() {
       if (result?.error) {
         throw new Error("Invalid credentials")
       }
-    router.push('/dashboard');
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
     }
     catch (error) {
       if (error instanceof Error) {
