@@ -1,4 +1,3 @@
-// lib/email-service.ts
 import nodemailer from "nodemailer";
 
 // Configure transporter
@@ -14,15 +13,15 @@ const transporter = nodemailer.createTransport({
 
 export async function sendOTPEmail(to: string, otp: string, type: 'signup' | 'reset') {
   const subject = type === 'signup' 
-    ? 'Verify your email for CodeApp'
-    : 'Reset your password for CodeApp';
+    ? 'Verify your email for Quiz Platform'
+    : 'Reset your password for Quiz Platform';
   
   const text = type === 'signup'
     ? `Your verification code is: ${otp}. It will expire in 10 minutes.`
     : `Your password reset code is: ${otp}. It will expire in 10 minutes.`;
 
   return transporter.sendMail({
-    from: `"CodeApp" <${process.env.EMAIL_USER}>`,
+    from: `"Quiz Platform" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     text,

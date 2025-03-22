@@ -1,26 +1,23 @@
+// components/profile-dropdown.tsx - Update the component to use session data
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { User } from 'lucide-react'
+import { User, LogOut } from 'lucide-react'
 import Image from 'next/image'
+import { useSession, signOut } from "next-auth/react"
 import EditProfileSubpage from './edit-profile-subpage'
 
-interface ProfileDropdownProps {
-  username?: string
-  email?: string
-  avatarUrl?: string
-}
-
-export function ProfileDropdown({ 
-  username = "JohnDoe",
-  email = "john@example.com",
-  avatarUrl = "/placeholder.svg"
-}: ProfileDropdownProps) {
+export function ProfileDropdown() {
+  const { data: session } = useSession()
   const [isOpen, setIsOpen] = useState(false)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  
+  const username = session?.user?.name || "User"
+  const email = session?.user?.email || ""
+  const avatarUrl = session?.user?.image || "/placeholder.svg"
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -48,7 +45,17 @@ export function ProfileDropdown({
         className="text-[#e0e0e0] hover:text-white hover:bg-purple-500/10"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <User className="h-5 w-5" />
+        {session?.user?.image ? (
+          <Image
+            src={avatarUrl}
+            alt={username}
+            width={24}
+            height={24}
+            className="rounded-full"
+          />
+        ) : (
+          <User className="h-5 w-5" />
+        )}
       </Button>
       {isOpen && (
         <Card className="absolute right-0 top-full mt-2 w-72 bg-[#242b3d] border-purple-500/20 text-[#e0e0e0] shadow-lg rounded-md overflow-hidden">
@@ -66,13 +73,21 @@ export function ProfileDropdown({
                 <p className="text-sm text-gray-400">{email}</p>
               </div>
             </div>
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <Button 
                 variant="secondary" 
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={handleEditProfile}
               >
                 Edit Profile
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full border-purple-500/20 text-white hover:bg-purple-500/10"
+                onClick={() => signOut({ callbackUrl: '/' })}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
               </Button>
             </div>
           </div>
@@ -83,14 +98,35 @@ export function ProfileDropdown({
           username={username}
           avatarUrl={avatarUrl}
           onClose={() => setShowEditProfile(false)}
-          onSave={(newUsername, newAvatarUrl) => {
-            // Handle saving the updated profile information
-            console.log('Saving profile:', newUsername, newAvatarUrl)
-            setShowEditProfile(false)
+          onSave={async (newUsername, newAvatarUrl, selectedFile) => {
+            // Handle saving the updated profile information to database
+            try {
+              const formData = new FormData();
+              formData.append('username', newUsername);
+              if (selectedFile) {
+                formData.append('avatar', selectedFile);
+              }
+              
+              const response = await fetch('/api/user/profile', {
+                method: 'PUT',
+                body: formData,
+              });
+              
+              if (!response.ok) {
+                throw new Error('Failed to update profile');
+              }
+              
+              // Force refresh session to get updated data
+              window.location.reload();
+            } catch (error) {
+              console.error('Error updating profile:', error);
+              alert('Failed to update profile');
+            }
+            
+            setShowEditProfile(false);
           }}
         />
       )}
     </div>
   )
 }
-
