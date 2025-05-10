@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
-// This middleware runs on all requests
+// This middleware runs on all requests (except those in the matcher config)
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   
@@ -22,7 +22,8 @@ export async function middleware(request: NextRequest) {
   })
   
   // If it's a public path and user is logged in, redirect to dashboard
-  if (isPublicPath && token && (path === '/login' || path === '/signup' || path === '/forgot-password')) {
+  // Only redirect login/signup/forgot-password, not other public pages
+  if (token && (path === '/login' || path === '/signup' || path === '/forgot-password')) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
   
@@ -46,7 +47,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public (public files)
+     * - api (API routes)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
   ],
 }

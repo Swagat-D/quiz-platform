@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { generateEmailTemplate, generatePlainTextEmail } from "./email-template";
 
 // Configure transporter
 const transporter = nodemailer.createTransport({
@@ -13,32 +14,39 @@ const transporter = nodemailer.createTransport({
 
 export async function sendOTPEmail(to: string, otp: string, type: 'signup' | 'reset') {
   const subject = type === 'signup' 
-    ? 'Verify your email for Quiz Platform'
-    : 'Reset your password for Quiz Platform';
+    ? 'Verify your email for DevQuizWare'
+    : 'Reset your password for DevQuizWare';
   
-  const text = type === 'signup'
-    ? `Your verification code is: ${otp}. It will expire in 10 minutes.`
-    : `Your password reset code is: ${otp}. It will expire in 10 minutes.`;
+  const title = type === 'signup'
+    ? 'Email Verification'
+    : 'Password Reset';
+  
+  const htmlContent = `
+    <p>Your ${type === 'signup' ? 'verification' : 'password reset'} code is:</p>
+    <div style="margin: 20px 0; padding: 10px; background-color: #f0f0f0; font-size: 24px; text-align: center; letter-spacing: 5px; font-family: monospace; font-weight: bold; border-radius: 4px;">
+      ${otp}
+    </div>
+    <p>This code will expire in 10 minutes.</p>
+    <p>If you didn't request this, please ignore this email.</p>
+  `;
+  
+  const plainTextContent = `
+Your ${type === 'signup' ? 'verification' : 'password reset'} code is: ${otp}
+
+This code will expire in 10 minutes.
+
+If you didn't request this, please ignore this email.
+  `;
+  
+  // Generate the email HTML and plain text using our template
+  const htmlEmail = generateEmailTemplate(title, htmlContent);
+  const plainTextEmail = generatePlainTextEmail(title, plainTextContent);
 
   return transporter.sendMail({
-    from: `"Quiz Platform" <${process.env.EMAIL_USER}>`,
+    from: `"DevQuizWare" <${process.env.EMAIL_USER}>`,
     to,
     subject,
-    text,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #242b3d; padding: 20px; text-align: center; color: #b388ff;">
-          <h1>${subject}</h1>
-        </div>
-        <div style="padding: 20px; border: 1px solid #eee;">
-          <p>Here is your ${type === 'signup' ? 'verification' : 'password reset'} code:</p>
-          <div style="margin: 20px 0; padding: 10px; background-color: #f0f0f0; font-size: 24px; text-align: center; letter-spacing: 5px;">
-            ${otp}
-          </div>
-          <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        </div>
-      </div>
-    `,
+    text: plainTextEmail,
+    html: htmlEmail,
   });
 }

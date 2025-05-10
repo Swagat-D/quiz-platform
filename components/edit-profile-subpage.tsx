@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, Camera, Eye, Upload } from 'lucide-react'
+import { X, Eye, Upload, User } from 'lucide-react'
 import Image from 'next/image'
 import {
   Dialog,
@@ -30,6 +30,7 @@ export default function EditProfileSubpage({
   const [newUsername, setNewUsername] = useState(username)
   const [newAvatarUrl, setNewAvatarUrl] = useState(avatarUrl)
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageError, setImageError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,11 +38,16 @@ export default function EditProfileSubpage({
     if (file) {
       setSelectedFile(file);
       setNewAvatarUrl(URL.createObjectURL(file));
+      setImageError(false);
     }
   };
 
   const handleSave = () => {
     onSave(newUsername, newAvatarUrl, selectedFile);
+  }
+
+  const handleImageError = () => {
+    setImageError(true);
   }
 
   return (
@@ -56,13 +62,21 @@ export default function EditProfileSubpage({
         <CardContent className="space-y-4">
           <div className="flex flex-col items-center">
             <div className="relative group">
-              <Image
-                src={newAvatarUrl}
-                alt={newUsername}
-                width={100}
-                height={100}
-                className="rounded-full mb-4"
-              />
+              {imageError ? (
+                <div className="w-24 h-24 rounded-full bg-purple-500/20 flex items-center justify-center mb-4">
+                  <User className="h-12 w-12 text-purple-400" />
+                </div>
+              ) : (
+                <Image
+                  src={newAvatarUrl}
+                  alt={newUsername}
+                  width={100}
+                  height={100}
+                  className="rounded-full mb-4"
+                  onError={handleImageError}
+                  unoptimized={true}
+                />
+              )}
               <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="flex space-x-2">
                   <Dialog>
@@ -79,13 +93,21 @@ export default function EditProfileSubpage({
                         </DialogDescription>
                       </DialogHeader>
                       <div className="flex items-center justify-center p-6">
-                        <Image
-                          src={newAvatarUrl}
-                          alt={newUsername}
-                          width={300}
-                          height={300}
-                          className="rounded-lg"
-                        />
+                        {imageError ? (
+                          <div className="w-48 h-48 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                            <User className="h-24 w-24 text-purple-400" />
+                          </div>
+                        ) : (
+                          <Image
+                            src={newAvatarUrl}
+                            alt={newUsername}
+                            width={300}
+                            height={300}
+                            className="rounded-lg"
+                            onError={handleImageError}
+                            unoptimized={true}
+                          />
+                        )}
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -125,4 +147,3 @@ export default function EditProfileSubpage({
     </div>
   )
 }
-
