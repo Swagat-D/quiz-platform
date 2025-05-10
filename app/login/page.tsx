@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { useState, useEffect } from "react"
+import { signIn, useSession } from "next-auth/react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, ArrowLeft, Code, Moon, Sun } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import {
@@ -32,13 +32,26 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [error, setError] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  const { status } = useSession()
+  
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push(callbackUrl);
+    }
+  }, [status, router, callbackUrl]);
+
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
+    setError("");
 
     try {
       const result = await signIn('credentials', {
@@ -48,27 +61,31 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        throw new Error("Invalid credentials")
+        setError("Invalid credentials. Please check your email and password.");
+      } else if (result?.ok) {
+        router.push(callbackUrl);
       }
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 500);
     }
-    catch (error) {
-      if (error instanceof Error) {
-        alert(error.message || "Login Failed");
-      } else {
-        alert("Login Failed");
-      }
-    }finally {
-      setIsLoading(false)
+    catch  {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode)
+    setIsDarkMode(!isDarkMode);
     // In a real app, you'd update the class on the html element
     // document.documentElement.classList.toggle('dark')
+  }
+
+  // If still checking authentication status, show loading
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
+        <div className="text-[#b388ff] text-xl">Loading...</div>
+      </div>
+    );
   }
 
   return (
@@ -103,6 +120,12 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {error && (
+                <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4 text-sm">
+                  {error}
+                </div>
+              )}
+              
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email" className={isDarkMode ? 'text-[#e0e0e0]' : 'text-gray-700'}>Email</Label>
@@ -165,7 +188,7 @@ export default function LoginPage() {
               </div>
               <Button 
                 type="button"
-                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                onClick={() => signIn('google', { callbackUrl })}
                 className="w-full bg-white hover:bg-gray-100 text-gray-900"
               >
                 <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
@@ -202,4 +225,3 @@ export default function LoginPage() {
     </div>
   )
 }
-

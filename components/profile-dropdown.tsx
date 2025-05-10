@@ -4,10 +4,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { User, LogOut } from 'lucide-react'
+import { User } from 'lucide-react'
 import Image from 'next/image'
-import { useSession, signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import EditProfileSubpage from './edit-profile-subpage'
+import { LogoutButton } from './logout-button'
 
 export function ProfileDropdown() {
   const { data: session } = useSession()
@@ -81,14 +82,11 @@ export function ProfileDropdown() {
               >
                 Edit Profile
               </Button>
-              <Button 
+              <LogoutButton 
                 variant="outline" 
                 className="w-full border-purple-500/20 text-white hover:bg-purple-500/10"
-                onClick={() => signOut({ callbackUrl: '/' })}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+                text="Sign Out"
+              />
             </div>
           </div>
         </Card>

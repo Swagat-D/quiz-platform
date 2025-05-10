@@ -1,7 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { getDb } from '@/lib/mongodb';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { code } = req.query;
@@ -10,14 +8,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ message: 'Invalid room code' });
   }
 
-  const room = await prisma.room.findUnique({
-    where: { code },
-    include: { questions: true },
-  });
+  const db = await getDb();
+  const room = await db.collection('rooms').findOne({ code });
 
   if (!room) {
     return res.status(404).json({ message: 'Room not found' });
   }
 
-  res.status(200).json(room);
+  // Get questions for this room
+  const questions = await db.collection('questions')
+    .find({ roomId: room._id.toString() })
+    .toArray();
+
+  // Add questions to room object
+  const roomWithQuestions = {
+    ...room,
+    questions
+  };
+
+  res.status(200).json(roomWithQuestions);
 }

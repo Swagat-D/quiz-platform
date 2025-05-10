@@ -1,29 +1,52 @@
-import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
-import { NextRequest } from "next/server";
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 
-export async function middleware(req: NextRequest) {
-  const token = await getToken({ req });
-  const isAuthenticated = !!token;
+// This middleware runs on all requests
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
   
-  const isAuthPage = req.nextUrl.pathname.startsWith("/login") || 
-                     req.nextUrl.pathname.startsWith("/signup") ||
-                     req.nextUrl.pathname.startsWith("/forgot-password");
-
-  if (isAuthPage) {
-    if (isAuthenticated) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-    return NextResponse.next();
-  }
-
-  if (!isAuthenticated && req.nextUrl.pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  // Define public paths that don't require authentication
+  const isPublicPath = path === '/' || 
+                       path === '/login' || 
+                       path === '/signup' || 
+                       path === '/forgot-password' || 
+                       path === '/about' || 
+                       path === '/contact' ||
+                       path.startsWith('/api/auth')
+  
+  // Get the session token
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET
+  })
+  
+  // If it's a public path and user is logged in, redirect to dashboard
+  if (isPublicPath && token && (path === '/login' || path === '/signup' || path === '/forgot-password')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
   
-  return NextResponse.next();
+  // If it's not a public path and user is not logged in, redirect to login
+  if (!isPublicPath && !token) {
+    // Store the original path to redirect after login
+    const url = new URL('/login', request.url)
+    url.searchParams.set('callbackUrl', path)
+    return NextResponse.redirect(url)
+  }
+  
+  return NextResponse.next()
 }
 
+// Configure paths that should be checked by this middleware
 export const config = {
-  matcher: ["/login", "/signup", "/forgot-password", "/dashboard/:path*"],
-};
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public (public files)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+  ],
+}

@@ -1,7 +1,7 @@
 // app/api/register/route.ts
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/mongodb";
 import { saveOTP } from "@/lib/otp-service";
 import { sendOTPEmail } from "@/lib/email-service";
 
@@ -9,10 +9,10 @@ export async function POST(req: Request) {
   try {
     const { name, email, password } = await req.json();
     
+    const db = await getDb();
+    
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
+    const existingUser = await db.collection('users').findOne({ email });
 
     if (existingUser) {
       return NextResponse.json(
@@ -25,13 +25,13 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create the user (unverified)
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        emailVerified: false,
-      },
+    const result = await db.collection('users').insertOne({
+      name,
+      email,
+      password: hashedPassword,
+      emailVerified: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
 
     // Generate and save OTP
@@ -43,9 +43,9 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { 
         user: { 
-          id: user.id, 
-          name: user.name, 
-          email: user.email 
+          id: result.insertedId.toString(), 
+          name, 
+          email 
         },
         message: "Registration initiated. Please verify your email." 
       },

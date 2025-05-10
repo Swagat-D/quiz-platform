@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/mongodb";
 import { verifyOTP } from "@/lib/otp-service";
 
 export async function POST(req: Request) {
@@ -25,10 +25,16 @@ export async function POST(req: Request) {
     
     // If it's a signup verification, mark the user as verified
     if (type === 'signup') {
-      await prisma.user.update({
-        where: { email },
-        data: { emailVerified: true },
-      });
+      const db = await getDb();
+      await db.collection('users').updateOne(
+        { email },
+        { 
+          $set: { 
+            emailVerified: true,
+            updatedAt: new Date()
+          } 
+        }
+      );
     }
 
     return NextResponse.json(

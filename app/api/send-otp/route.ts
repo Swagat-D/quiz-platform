@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/mongodb";
 import { saveOTP } from "@/lib/otp-service";
 import { sendOTPEmail } from "@/lib/email-service";
 
@@ -16,9 +16,8 @@ export async function POST(req: Request) {
     
     // For password reset, check if user exists
     if (type === 'reset') {
-      const user = await prisma.user.findUnique({
-        where: { email }
-      });
+      const db = await getDb();
+      const user = await db.collection('users').findOne({ email });
 
       if (!user) {
         return NextResponse.json(

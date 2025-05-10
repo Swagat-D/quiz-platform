@@ -1,19 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { LogOut, Code, Settings, Menu, X, ArrowLeft, User2 } from 'lucide-react'
+import { Code, Settings, Menu, X, ArrowLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { ProfileDropdown } from './profile-dropdown'
 import { SettingsSubpage } from './settings-subpage'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { useSession } from "next-auth/react"
+import { LogoutButton } from './logout-button'
 
 interface NavbarProps {
   showBack?: boolean
@@ -92,14 +88,13 @@ export default function Navbar({ showBack }: NavbarProps) {
               </Button>
               {isSettingsOpen && <SettingsSubpage onClose={() => setIsSettingsOpen(false)} />}
             </div>
-            <Button 
+            <LogoutButton 
               variant="default" 
               size="sm" 
               className="bg-purple-600 hover:bg-purple-700 text-white"
-              onClick={() => router.push('/')}
-            >
-              Logout
-            </Button>
+              text="Logout"
+              showIcon={false}
+            />
           </div>
         </div>
       </div>
@@ -155,18 +150,14 @@ export default function Navbar({ showBack }: NavbarProps) {
 
           {/* Sidebar Footer */}
           <div className="mt-auto p-4 border-t border-purple-500/20">
-            <Button 
+            <LogoutButton 
               variant="default" 
               size="lg" 
               className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              <LogOut className="h-5 w-5 mr-2" />
-              Logout
-            </Button>
+            />
           </div>
         </div>
       </div>
     </nav>
   )
 }
-

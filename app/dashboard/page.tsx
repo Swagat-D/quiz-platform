@@ -3,11 +3,30 @@
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Plus, Users } from 'lucide-react'
+import { useSession } from "next-auth/react"
+import { useEffect } from 'react'
 
 export default function Dashboard() {
   const router = useRouter()
+  const { status } = useSession()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
+
+  // Show loading state or nothing while checking authentication
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
+        <div className="text-[#b388ff] text-xl">Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#1a1f2e]">
@@ -63,4 +82,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

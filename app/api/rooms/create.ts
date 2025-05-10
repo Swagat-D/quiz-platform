@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-import { generateRoomCode } from '@/utils/roomCode'; // Adjust path as needed
-
-const prisma = new PrismaClient();
+import { getDb } from '@/lib/mongodb';
+import { generateRoomCode } from '@/utils/generate-room-code'; // Adjust path as needed
+import { ObjectId } from 'mongodb';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -17,18 +16,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let roomCode;
   let isUnique = false;
+  
+  const db = await getDb();
+  
   do {
     roomCode = generateRoomCode();
-    const existingRoom = await prisma.room.findUnique({ where: { code: roomCode } });
+    const existingRoom = await db.collection('rooms').findOne({ code: roomCode });
     isUnique = !existingRoom;
   } while (!isUnique);
 
-  const room = await prisma.room.create({
-    data: {
-      code: roomCode,
-      creatorId: userId,
-    },
+  const room = await db.collection('rooms').insertOne({
+    code: roomCode,
+    creatorId: userId,
+    createdAt: new Date(),
+    updatedAt: new Date()
   });
 
-  res.status(201).json({ roomCode: room.code });
+  res.status(201).json({ roomCode });
 }

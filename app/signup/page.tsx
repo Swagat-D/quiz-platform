@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowLeft, Code } from 'lucide-react'
 import { Button } from "@/components/ui/button"
-import { signIn } from "next-auth/react"
+import { signIn, useSession } from "next-auth/react"
 import {
   Card,
   CardContent,
@@ -25,22 +25,34 @@ export default function SignUpPage() {
   const [step, setStep] = useState<Step>('form')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   })
   const router = useRouter()
+  const { status } = useSession()
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/dashboard');
+    }
+  }, [status, router]);
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/
   const isPasswordValid = passwordRegex.test(formData.password)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
+    
     if (!isPasswordValid) {
-      alert("Please ensure your password meets the requirements.")
+      setError("Please ensure your password meets the requirements.")
       return;
     }
+    
     setIsLoading(true);
   
     try {
@@ -61,9 +73,9 @@ export default function SignUpPage() {
       setStep('verify');
     } catch (error) {
       if (error instanceof Error) {
-        alert(error.message);
+        setError(error.message);
       } else {
-        alert('Something went wrong');
+        setError('Something went wrong');
       }
     } finally {
       setIsLoading(false);
@@ -72,6 +84,7 @@ export default function SignUpPage() {
 
   const handleVerifyOTP = async (otp: string) => {
     setIsLoading(true)
+    setError("")
     
     try {
       const response = await fetch('/api/verify', {
@@ -92,16 +105,25 @@ export default function SignUpPage() {
       }
   
       // Successful verification, redirect to login
-      router.push('/login');
+      router.push('/login?verified=true');
     } catch (error) {
       if (error instanceof Error) {
-        alert(error.message);
+        setError(error.message);
       } else {
-        alert('Something went wrong');
+        setError('Something went wrong');
       }
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // If still checking authentication status, show loading
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
+        <div className="text-[#b388ff] text-xl">Loading...</div>
+      </div>
+    );
   }
 
   return (
@@ -133,6 +155,12 @@ export default function SignUpPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {error && (
+                <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4 text-sm">
+                  {error}
+                </div>
+              )}
+              
               {step === 'form' ? (
                 <form onSubmit={handleSendOTP} className="space-y-4">
                   <div className="space-y-2">
@@ -208,7 +236,6 @@ export default function SignUpPage() {
                   <Button
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                     disabled={isLoading}
-                    onClick={() => handleVerifyOTP('123456')}
                   >
                     {isLoading ? <Spinner className="mr-2" /> : null}
                     {isLoading ? 'Verifying...' : 'Verify & Create Account'}
@@ -265,4 +292,3 @@ export default function SignUpPage() {
     </div>
   )
 }
-

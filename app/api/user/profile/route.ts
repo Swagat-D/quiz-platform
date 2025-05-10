@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]/route';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { getDb } from '@/lib/mongodb';
 
 export async function PUT(request: Request) {
   try {
@@ -22,13 +20,17 @@ export async function PUT(request: Request) {
     // For this example, we'll skip actual file upload
     
     // Update user in database
-    await prisma.user.update({
-      where: { email: session.user.email as string },
-      data: { 
-        name: username,
-        // If you had an avatar URL from upload service, you'd add it here
+    const db = await getDb();
+    await db.collection('users').updateOne(
+      { email: session.user.email as string },
+      { 
+        $set: { 
+          name: username,
+          updatedAt: new Date()
+          // If you had an avatar URL from upload service, you'd add it here
+        } 
       }
-    });
+    );
     
     return NextResponse.json({ success: true });
   } catch (error) {

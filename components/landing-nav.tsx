@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Code, Menu, X, LogOut } from 'lucide-react'
+import { Code, Menu } from 'lucide-react'
 import { Button } from "@/components/ui/button"
+import { useSession } from "next-auth/react"
 import {
   Sheet,
   SheetContent,
@@ -11,9 +12,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { LogoutButton } from "./logout-button"
 
 export default function LandingNav() {
   const [isOpen, setIsOpen] = useState(false)
+  const { data: session } = useSession()
 
   const navItems = [
     { href: "/", label: "Home" },
@@ -58,14 +61,31 @@ export default function LandingNav() {
                   ))}
                 </nav>
                 <div className="border-t border-purple-500/20 p-4">
-                  <Link href="/login" onClick={() => setIsOpen(false)}>
-                    <Button
-                      variant="secondary"
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white mb-2"
-                    >
-                      Log In / Sign Up
-                    </Button>
-                  </Link>
+                  {session ? (
+                    <>
+                      <Link href="/dashboard" onClick={() => setIsOpen(false)}>
+                        <Button
+                          variant="secondary"
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white mb-2"
+                        >
+                          Dashboard
+                        </Button>
+                      </Link>
+                      <LogoutButton
+                        variant="outline"
+                        className="w-full text-[#e0e0e0] hover:text-white border-purple-500/20 hover:bg-purple-500/10"
+                      />
+                    </>
+                  ) : (
+                    <Link href="/login" onClick={() => setIsOpen(false)}>
+                      <Button
+                        variant="secondary"
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white mb-2"
+                      >
+                        Log In / Sign Up
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             </SheetContent>
@@ -88,20 +108,35 @@ export default function LandingNav() {
             ))}
           </nav>
           <div className="hidden md:flex items-center space-x-2">
-            <Link href="/login">
-              <Button variant="ghost" className="text-[#e0e0e0] hover:text-white hover:bg-purple-500/10">
-                Log In
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                Sign Up
-              </Button>
-            </Link>
+            {session ? (
+              <>
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="text-[#e0e0e0] hover:text-white hover:bg-purple-500/10">
+                    Dashboard
+                  </Button>
+                </Link>
+                <LogoutButton 
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  text="Sign Out"
+                />
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" className="text-[#e0e0e0] hover:text-white hover:bg-purple-500/10">
+                    Log In
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
     </header>
   )
 }
-
