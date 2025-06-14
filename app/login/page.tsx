@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { signIn, useSession } from "next-auth/react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Eye, EyeOff, ArrowLeft, Code, Moon, Sun } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, Code, Mail, Lock, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -15,24 +15,30 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
-import LandingNav from "@/components/landing-nav"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 
 const schema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(8, { message: "Password must be at least 8 characters long" }),
+  password: z.string().min(1, { message: "Password is required" }),
 })
 
 type FormData = z.infer<typeof schema>
 
+const FloatingElements = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute top-20 left-10 w-20 h-20 bg-purple-500/5 rounded-full blur-xl animate-pulse"></div>
+    <div className="absolute top-40 right-20 w-32 h-32 bg-blue-500/5 rounded-full blur-xl animate-pulse delay-1000"></div>
+    <div className="absolute bottom-40 left-20 w-24 h-24 bg-pink-500/5 rounded-full blur-xl animate-pulse delay-2000"></div>
+  </div>
+);
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(true)
   const [error, setError] = useState("")
+  const [isVisible, setIsVisible] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
@@ -41,6 +47,10 @@ export default function LoginPage() {
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+
+  useEffect(() => {
+    setIsVisible(true)
+  }, [])
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -65,162 +75,176 @@ export default function LoginPage() {
       } else if (result?.ok) {
         router.push(callbackUrl);
       }
-    }
-    catch  {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    // In a real app, you'd update the class on the html element
-    // document.documentElement.classList.toggle('dark')
-  }
-
   // If still checking authentication status, show loading
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
-        <div className="text-[#b388ff] text-xl">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] via-[#1a1f2e] to-[#2a1f3d] flex justify-center items-center">
+        <div className="text-[#b388ff] text-xl flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-[#1a1f2e]' : 'bg-gray-100'}`}>
-      <LandingNav />
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] via-[#1a1f2e] to-[#2a1f3d] flex items-center justify-center relative overflow-hidden">
+      <FloatingElements />
+      
+      {/* Back Button */}
       <Button
         variant="ghost"
         size="icon"
-        className={`absolute top-20 left-4 ${isDarkMode ? 'text-[#e0e0e0] hover:text-white hover:bg-purple-500/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'}`}
+        className="absolute top-8 left-8 text-gray-400 hover:text-white transition-colors z-10"
         onClick={() => router.back()}
       >
-        <ArrowLeft className="h-5 w-5" />
+        <ArrowLeft className="h-6 w-6" />
       </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className={`absolute top-20 right-4 ${isDarkMode ? 'text-[#e0e0e0] hover:text-white hover:bg-purple-500/10' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'}`}
-        onClick={toggleDarkMode}
-      >
-        {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-      </Button>
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md">
-          <Card className={isDarkMode ? "bg-[#242b3d] border-purple-500/20" : "bg-white"}>
-            <CardHeader className="space-y-1">
-              <div className="flex items-center justify-center mb-4">
-                <Code className="h-10 w-10 text-[#b388ff]" />
-              </div>
-              <CardTitle className={`text-2xl font-bold text-center ${isDarkMode ? 'text-[#b388ff]' : 'text-gray-900'}`}>Welcome Back!</CardTitle>
-              <CardDescription className={`text-center ${isDarkMode ? 'text-[#a0a0a0]' : 'text-gray-500'}`}>
-                Enter your credentials to access your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {error && (
-                <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4 text-sm">
-                  {error}
-                </div>
-              )}
-              
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className={isDarkMode ? 'text-[#e0e0e0]' : 'text-gray-700'}>Email</Label>
-                  <Input
-                    id="email"
-                    {...register('email')}
-                    placeholder="m@example.com"
-                    className={isDarkMode ? 'bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]' : 'bg-white border-gray-300 text-gray-900'}
-                  />
-                  {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className={isDarkMode ? 'text-[#e0e0e0]' : 'text-gray-700'}>Password</Label>
-                    <Link
-                      className={`text-sm ${isDarkMode ? 'text-[#b388ff]' : 'text-purple-600'} underline-offset-4 hover:underline`}
-                      href="/forgot-password"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      {...register('password')}
-                      type={showPassword ? "text" : "password"}
-                      className={isDarkMode ? 'bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]' : 'bg-white border-gray-300 text-gray-900'}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className={`absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent ${isDarkMode ? 'text-[#a0a0a0]' : 'text-gray-500'}`}
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                      <span className="sr-only">
-                        {showPassword ? "Hide password" : "Show password"}
-                      </span>
-                    </Button>
-                  </div>
-                  {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
-                </div>
-                <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white" disabled={isLoading}>
-                  {isLoading ? <Spinner className="mr-2" /> : null}
-                  {isLoading ? 'Signing In...' : 'Sign In'}
-                </Button>
-              </form>
 
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-purple-500/20" />
+      <div className={`w-full max-w-md mx-4 transition-all duration-1000 ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+      }`}>
+        {/* Card */}
+        <Card className="bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="inline-block p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl mx-auto">
+              <Code className="h-8 w-8 text-white" />
+            </div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              Welcome Back!
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Sign in to continue your learning journey
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
+            )}
+            
+            {/* Form */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Email Field */}
+              <div className="space-y-2">
+                <Label className="text-gray-300">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Input
+                    {...register('email')}
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className={`px-2 ${isDarkMode ? 'bg-[#242b3d] text-[#a0a0a0]' : 'bg-white text-gray-500'}`}>Or continue with</span>
+                {errors.email && <p className="text-red-400 text-sm">{errors.email.message}</p>}
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-gray-300">Password</Label>
+                  <Link
+                    className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                    href="/forgot-password"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Input
+                    {...register('password')}
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    className="pl-10 pr-12 bg-white/5 border-white/10 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:text-white transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {errors.password && <p className="text-red-400 text-sm">{errors.password.message}</p>}
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold hover:from-purple-600 hover:to-blue-600 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Signing in...
+                  </div>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+
+              {/* Divider */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-black/40 text-gray-400">Or continue with</span>
                 </div>
               </div>
-              <Button 
+
+              {/* Google Sign In */}
+              <Button
                 type="button"
                 onClick={() => signIn('google', { callbackUrl })}
-                className="w-full bg-white hover:bg-gray-100 text-gray-900"
+                variant="outline"
+                className="w-full py-3 bg-white/5 border-white/10 text-white hover:bg-white/10 transition-all flex items-center justify-center gap-3"
               >
-                <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
-                  <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                    <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
-                    <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
-                    <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
-                    <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
-                  </g>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                Sign in with Google
-              </Button>             
-              <div className={`mt-6 text-center text-sm ${isDarkMode ? 'text-[#a0a0a0]' : 'text-gray-500'}`}>
-                Don&apos;t have an account?{" "}
-                <Link
-                  className={`${isDarkMode ? 'text-[#b388ff]' : 'text-purple-600'} underline-offset-4 hover:underline`}
-                  href="/signup"
-                >
-                  Sign up
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-          <div className={`mt-8 text-center text-sm ${isDarkMode ? 'text-[#a0a0a0]' : 'text-gray-500'}`}>
-            <p>By signing in, you agree to our</p>
-            <p className="mt-1">
-              <Link href="#" className={`${isDarkMode ? 'text-[#b388ff]' : 'text-purple-600'} hover:underline`}>Terms of Service</Link>
-              {" "}and{" "}
-              <Link href="#" className={`${isDarkMode ? 'text-[#b388ff]' : 'text-purple-600'} hover:underline`}>Privacy Policy</Link>
+                Continue with Google
+              </Button>
+            </form>
+
+            {/* Sign Up Link */}
+            <p className="text-center text-gray-400 mt-8">
+              Don&apos;t have an account?{' '}
+              <Link
+                className="text-purple-400 hover:text-purple-300 transition-colors font-medium"
+                href="/signup"
+              >
+                Sign up
+              </Link>
             </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+
+        {/* Terms */}
+        <p className="text-center text-xs text-gray-500 mt-6">
+          By signing in, you agree to our{' '}
+          <Link href="/terms" className="text-purple-400 hover:underline">Terms of Service</Link>
+          {' '}and{' '}
+          <Link href="/privacy" className="text-purple-400 hover:underline">Privacy Policy</Link>
+        </p>
       </div>
     </div>
   )

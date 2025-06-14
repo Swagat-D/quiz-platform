@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, ArrowLeft, Code } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, Code, Mail, Lock, User, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { signIn, useSession } from "next-auth/react"
 import {
@@ -16,23 +16,35 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { OTPInput } from "@/components/ui/otp-input"
-import { Spinner } from "@/components/ui/spinner"
-import LandingNav from "@/components/landing-nav"
 
-type Step = 'form' | 'verify'
+type Step = 'form' | 'verify' | 'welcome'
+
+const FloatingElements = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute top-20 left-10 w-20 h-20 bg-purple-500/5 rounded-full blur-xl animate-pulse"></div>
+    <div className="absolute top-40 right-20 w-32 h-32 bg-blue-500/5 rounded-full blur-xl animate-pulse delay-1000"></div>
+    <div className="absolute bottom-40 left-20 w-24 h-24 bg-pink-500/5 rounded-full blur-xl animate-pulse delay-2000"></div>
+  </div>
+);
 
 export default function SignUpPage() {
   const [step, setStep] = useState<Step>('form')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [isVisible, setIsVisible] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   })
+  const [passwordStrength, setPasswordStrength] = useState(0)
   const router = useRouter()
   const { status } = useSession()
+
+  useEffect(() => {
+    setIsVisible(true)
+  }, [])
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -40,6 +52,36 @@ export default function SignUpPage() {
       router.push('/dashboard');
     }
   }, [status, router]);
+
+  useEffect(() => {
+    // Calculate password strength
+    const password = formData.password;
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    setPasswordStrength(strength);
+  }, [formData.password]);
+
+  const steps = [
+    { title: 'Create Account', description: 'Enter your basic information' },
+    { title: 'Verify Email', description: 'Check your email for verification code' },
+    { title: 'Welcome', description: 'Account created successfully!' }
+  ];
+
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength <= 2) return 'bg-red-500';
+    if (passwordStrength <= 3) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  const getPasswordStrengthText = () => {
+    if (passwordStrength <= 2) return 'Weak';
+    if (passwordStrength <= 3) return 'Medium';
+    return 'Strong';
+  };
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/
   const isPasswordValid = passwordRegex.test(formData.password)
@@ -104,8 +146,7 @@ export default function SignUpPage() {
         throw new Error(data.error || 'Verification failed');
       }
   
-      // Successful verification, redirect to login
-      router.push('/login?verified=true');
+      setStep('welcome');
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);
@@ -120,175 +161,379 @@ export default function SignUpPage() {
   // If still checking authentication status, show loading
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
-        <div className="text-[#b388ff] text-xl">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] via-[#1a1f2e] to-[#2a1f3d] flex justify-center items-center">
+        <div className="text-[#b388ff] text-xl flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1f2e] flex flex-col">
-      <LandingNav />
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1c] via-[#1a1f2e] to-[#2a1f3d] flex items-center justify-center relative overflow-hidden">
+      <FloatingElements />
+      
+      {/* Back Button */}
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-20 left-4 text-[#e0e0e0] hover:text-white hover:bg-purple-500/10"
+        className="absolute top-8 left-8 text-gray-400 hover:text-white transition-colors z-10"
         onClick={() => router.back()}
       >
-        <ArrowLeft className="h-5 w-5" />
+        <ArrowLeft className="h-6 w-6" />
       </Button>
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md">
-          <Card className="bg-[#242b3d] border-purple-500/20">
-            <CardHeader className="space-y-1">
-              <div className="flex items-center justify-center mb-4">
-                <Code className="h-10 w-10 text-[#b388ff]" />
-              </div>
-              <CardTitle className="text-2xl font-bold text-center text-[#b388ff]">
-                {step === 'form' ? 'Create an Account' : 'Verify Email'}
-              </CardTitle>
-              <CardDescription className="text-center text-[#a0a0a0]">
-                {step === 'form' 
-                  ? 'Join our community of developers and start your learning journey'
-                  : 'Enter the verification code sent to your email'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {error && (
-                <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4 text-sm">
-                  {error}
+
+      <div className={`w-full max-w-md mx-4 transition-all duration-1000 ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+      }`}>
+        {/* Progress Bar */}
+        {step !== 'welcome' && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              {steps.slice(0, -1).map((stepItem, index) => (
+                <div key={index} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                    (step === 'form' && index === 0) || (step === 'verify' && index <= 1) 
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' 
+                      : 'bg-white/10 text-gray-400'
+                  }`}>
+                    {(step === 'verify' && index === 0) ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  {index < steps.length - 2 && (
+                    <div className={`w-12 h-1 mx-2 transition-all ${
+                      step === 'verify' ? 'bg-gradient-to-r from-purple-500 to-blue-500' : 'bg-white/10'
+                    }`} />
+                  )}
                 </div>
-              )}
-              
-              {step === 'form' ? (
-                <form onSubmit={handleSendOTP} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-[#e0e0e0]">Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="John Doe"
-                      required
-                      className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                    />
+              ))}
+            </div>
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-white">{steps[step === 'form' ? 0 : 1].title}</h2>
+              <p className="text-gray-400 text-sm">{steps[step === 'form' ? 0 : 1].description}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Card */}
+        <Card className="bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl">
+          <CardContent className="p-8">
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg flex items-center gap-2 mb-6">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
+            )}
+
+            {step === 'form' && (
+              <>
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <div className="inline-block p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl mb-4">
+                    <Code className="h-8 w-8 text-white" />
                   </div>
+                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent mb-2">
+                    Join DevQuizWare
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Start your coding journey today
+                  </CardDescription>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSendOTP} className="space-y-6">
+                  {/* Name Field */}
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-[#e0e0e0]">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="m@example.com"
-                      required
-                      className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-[#e0e0e0]">Password</Label>
+                    <Label className="text-gray-300">Full Name</Label>
                     <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
-                        id="password"
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Enter your full name"
+                        required
+                        className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-300">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="Enter your email"
+                        required
+                        className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-300">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
                         type={showPassword ? "text" : "password"}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="Create a strong password"
                         required
-                        className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                        className="pl-10 pr-12 bg-white/5 border-white/10 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                       />
                       <Button
                         type="button"
                         variant="ghost"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-[#a0a0a0]"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:text-white transition-colors"
                         onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                        <span className="sr-only">
-                          {showPassword ? "Hide password" : "Show password"}
-                        </span>
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
-                    {formData.password && !isPasswordValid && (
-                      <p className="text-sm text-red-500">
-                        Password must be at least 8 characters long, contain uppercase and lowercase letters, and a special character.
-                      </p>
+                    
+                    {/* Password Strength */}
+                    {formData.password && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Password strength</span>
+                          <span className={`font-medium ${passwordStrength <= 2 ? 'text-red-400' : passwordStrength <= 3 ? 'text-yellow-400' : 'text-green-400'}`}>
+                            {getPasswordStrengthText()}
+                          </span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all ${getPasswordStrengthColor()}`}
+                            style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                          />
+                        </div>
+                        {!isPasswordValid && (
+                          <p className="text-sm text-red-400">
+                            Password must be at least 8 characters long, contain uppercase and lowercase letters, and a special character.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
+
+                  {/* Submit Button */}
                   <Button
                     type="submit"
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                    disabled={isLoading}
+                    disabled={isLoading || !formData.name || !formData.email || !formData.password}
+                    className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold hover:from-purple-600 hover:to-blue-600 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
-                    {isLoading ? <Spinner className="mr-2" /> : null}
-                    {isLoading ? 'Sending Verification Code...' : 'Verify Email'}
+                    {isLoading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Creating account...
+                      </div>
+                    ) : (
+                      'Create Account'
+                    )}
+                  </Button>
+
+                  {/* Divider */}
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/10"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-black/40 text-gray-400">Or continue with</span>
+                    </div>
+                  </div>
+
+                  {/* Google Sign Up */}
+                  <Button
+                    type="button"
+                    onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+                    variant="outline"
+                    className="w-full py-3 bg-white/5 border-white/10 text-white hover:bg-white/10 transition-all flex items-center justify-center gap-3"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
                   </Button>
                 </form>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-center">
-                    <OTPInput onComplete={handleVerifyOTP} />
-                  </div>
-                  <Button
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? <Spinner className="mr-2" /> : null}
-                    {isLoading ? 'Verifying...' : 'Verify & Create Account'}
-                  </Button>
-                </div>
-              )}
+              </>
+            )}
 
-                <div className="relative my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-purple-500/20" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-[#242b3d] px-2 text-[#a0a0a0]">Or continue with</span>
-                  </div>
-                </div>
-                <Button 
-                  type="button"
-                  onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                  className="w-full bg-white hover:bg-gray-100 text-gray-900"
-                >
-                  <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
-                    <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                      <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
-                      <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
-                      <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
-                      <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
-                    </g>
-                  </svg>
-                  Sign up with Google
-                </Button>
+            {step === 'verify' && (
+              <OTPVerificationStep 
+                email={formData.email}
+                onVerify={handleVerifyOTP}
+                isLoading={isLoading}
+              />
+            )}
 
-                
-              <div className="mt-6 text-center text-sm text-[#a0a0a0]">
-                Already have an account?{" "}
+            {step === 'welcome' && (
+              <WelcomeStep name={formData.name} />
+            )}
+
+            {/* Sign In Link */}
+            {step === 'form' && (
+              <p className="text-center text-gray-400 mt-8">
+                Already have an account?{' '}
                 <Link
-                  className="text-[#b388ff] underline-offset-4 hover:underline"
+                  className="text-purple-400 hover:text-purple-300 transition-colors font-medium"
                   href="/login"
                 >
                   Sign in
                 </Link>
-              </div>
-            </CardContent>
-          </Card>
-          <div className="mt-8 text-center text-sm text-[#a0a0a0]">
-            <p>By creating an account, you agree to our</p>
-            <p className="mt-1">
-              <Link href="#" className="text-[#b388ff] hover:underline">Terms of Service</Link>
-              {" "}and{" "}
-              <Link href="#" className="text-[#b388ff] hover:underline">Privacy Policy</Link>
-            </p>
-          </div>
-        </div>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Terms */}
+        {step === 'form' && (
+          <p className="text-center text-xs text-gray-500 mt-6">
+            By creating an account, you agree to our{' '}
+            <Link href="/terms" className="text-purple-400 hover:underline">Terms of Service</Link>
+            {' '}and{' '}
+            <Link href="/privacy" className="text-purple-400 hover:underline">Privacy Policy</Link>
+          </p>
+        )}
       </div>
     </div>
   )
 }
+
+// OTP Verification Component
+const OTPVerificationStep = ({ email, onVerify, isLoading }: {
+  email: string;
+  onVerify: (otp: string) => void;
+  isLoading: boolean;
+}) => {
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [resendTimer, setResendTimer] = useState(60);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setResendTimer((prev) => prev > 0 ? prev - 1 : 0);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length <= 1) {
+      const newOtp = [...otp];
+      newOtp[index] = value;
+      setOtp(newOtp);
+      
+      // Auto-focus next input
+      if (value && index < 5) {
+        const nextInput = document.getElementById(`otp-${index + 1}`);
+        nextInput?.focus();
+      }
+      
+      // Auto-submit when all fields are filled
+      if (newOtp.every(digit => digit !== '') && !isLoading) {
+        onVerify(newOtp.join(''));
+      }
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  return (
+    <div className="text-center">
+      <div className="mb-6">
+        <div className="inline-block p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl mb-4">
+          <Mail className="h-8 w-8 text-white" />
+        </div>
+        <CardTitle className="text-2xl font-bold text-white mb-2">Check your email</CardTitle>
+        <CardDescription className="text-gray-400">
+          We&apos;ve sent a verification code to<br />
+          <span className="text-purple-400 font-medium">{email}</span>
+        </CardDescription>
+      </div>
+
+      <div className="flex justify-center gap-2 mb-6">
+        {otp.map((digit, index) => (
+          <input
+            key={index}
+            id={`otp-${index}`}
+            type="text"
+            value={digit}
+            onChange={(e) => handleOtpChange(index, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(index, e)}
+            className="w-12 h-12 text-center text-xl font-bold bg-white/5 border border-white/10 rounded-lg text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+            maxLength={1}
+          />
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center gap-2 text-purple-400 mb-4">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Verifying...
+        </div>
+      )}
+
+      <p className="text-gray-400 text-sm">
+        Didn&apos;t receive the code?{' '}
+        {resendTimer > 0 ? (
+          <span>Resend in {resendTimer}s</span>
+        ) : (
+          <button className="text-purple-400 hover:text-purple-300 transition-colors">
+            Resend code
+          </button>
+        )}
+      </p>
+    </div>
+  );
+};
+
+// Welcome Step Component
+const WelcomeStep = ({ name }: { name: string }) => {
+  const router = useRouter();
+
+  return (
+    <div className="text-center">
+      <div className="mb-6">
+        <div className="inline-block p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl mb-4">
+          <CheckCircle className="h-8 w-8 text-white" />
+        </div>
+        <CardTitle className="text-2xl font-bold text-white mb-2">Welcome to DevQuizWare!</CardTitle>
+        <CardDescription className="text-gray-400">
+          Hi {name}, your account has been created successfully.
+        </CardDescription>
+      </div>
+
+      <div className="space-y-4">
+        <Button 
+          onClick={() => router.push('/dashboard')}
+          className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold hover:from-purple-600 hover:to-blue-600 transition-all transform hover:scale-105"
+        >
+          Go to Dashboard
+        </Button>
+        <Button 
+          onClick={() => router.push('/tour')}
+          variant="outline"
+          className="w-full py-3 bg-white/5 border-white/10 text-white hover:bg-white/10 transition-all"
+        >
+          Take a Quick Tour
+        </Button>
+      </div>
+    </div>
+  );
+};
