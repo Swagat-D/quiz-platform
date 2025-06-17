@@ -12,12 +12,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { 
-  Copy, Share2, Play, Settings, Users, MessageSquare, BarChart3, 
+  Copy, Share2, Play, Settings, Users, BarChart3, 
   Edit, Trash2, Calendar, Clock, AlertTriangle, CheckCircle2,
-  ClipboardCopy, Send, Plus, X, Eye, Download
+  ClipboardCopy, Send, Plus, X, Eye, Search, BookOpen
 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 interface Room {
   id: string
@@ -71,6 +79,46 @@ interface RoomStatistics {
   completionRate: number
 }
 
+interface Question {
+  id: string
+  title: string
+  content: string
+  options: string[]
+  correctAnswer: number
+  difficulty: 'easy' | 'medium' | 'hard'
+  category: string
+  explanation?: string
+  timeLimit?: number
+  points?: number
+  tags?: string[]
+  creatorName: string
+  isPublic: boolean
+  usage: number
+  createdAt: string
+  canEdit: boolean
+}
+
+interface RoomQuestion {
+  id: string
+  title: string
+  content: string
+  options: string[]
+  correctAnswer: number
+  difficulty: string
+  category: string
+  explanation?: string
+  timeLimit: number
+  points: number
+  order: number
+  isRequired: boolean
+}
+
+const CATEGORIES = [
+  'Programming', 'Web Development', 'Database', 'Algorithms', 
+  'System Design', 'DevOps', 'Mobile Development', 'AI/ML', 
+  'Cybersecurity', 'General Knowledge'
+]
+
 export default function RoomManagePage() {
   const params = useParams()
   const router = useRouter()
@@ -84,8 +132,34 @@ export default function RoomManagePage() {
   const [alertMessage, setAlertMessage] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Form state for room updates
+  // Questions state
+  const [roomQuestions, setRoomQuestions] = useState<RoomQuestion[]>([])
+  const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [difficultyFilter, setDifficultyFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [questionsLoading, setQuestionsLoading] = useState(false)
+
+  // New question form
   const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    options: ['', '', '', ''],
+    correctAnswer: 0,
+    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
+    category: '',
+    explanation: '',
+    timeLimit: 30,
+    points: 1,
+    isPublic: false
+  })
+
+  // Form state for room updates
+  const [roomFormData, setRoomFormData] = useState({
     title: '',
     description: '',
     maxParticipants: 50,
@@ -107,11 +181,12 @@ export default function RoomManagePage() {
     if (roomId) {
       fetchRoom()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
 
   useEffect(() => {
     if (room) {
-      setFormData({
+      setRoomFormData({
         title: room.title,
         description: room.description,
         maxParticipants: room.maxParticipants,
@@ -126,6 +201,13 @@ export default function RoomManagePage() {
     }
   }, [room])
 
+  useEffect(() => {
+    if (activeTab === 'questions') {
+      fetchRoomQuestions()
+      fetchAvailableQuestions()
+    }
+  }, [activeTab, searchQuery, categoryFilter, difficultyFilter, typeFilter])
+
   const fetchRoom = async () => {
     setIsLoading(true)
     try {
@@ -137,7 +219,7 @@ export default function RoomManagePage() {
       }
 
       if (data.room.creatorId !== session?.user?.id) {
-        toast.error('You are not authorized to manage this room')
+        alert('You are not authorized to manage this room')
         router.push('/dashboard')
         return
       }
@@ -145,10 +227,49 @@ export default function RoomManagePage() {
       setRoom(data.room)
     } catch (error) {
       console.error('Fetch room error:', error)
-      toast.error('Failed to load room')
+      alert('Failed to load room')
       router.push('/dashboard')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchRoomQuestions = async () => {
+    setQuestionsLoading(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/questions`)
+      const data = await response.json()
+      if (data.success) {
+        setRoomQuestions(data.questions || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch room questions:', error)
+    } finally {
+      setQuestionsLoading(false)
+    }
+  }
+
+  const fetchAvailableQuestions = async () => {
+    try {
+      const params = new URLSearchParams({
+        type: typeFilter,
+        page: '1',
+        limit: '50',
+        ...(searchQuery && { search: searchQuery }),
+        ...(categoryFilter && { category: categoryFilter }),
+        ...(difficultyFilter && { difficulty: difficultyFilter }),
+      })
+
+      const response = await fetch(`/api/questions?${params}`)
+      const data = await response.json()
+
+      if (data.success) {
+        const roomQuestionIds = roomQuestions.map(q => q.id)
+        const filtered = data.questions.filter((q: Question) => !roomQuestionIds.includes(q.id))
+        setAvailableQuestions(filtered)
+      }
+    } catch (error) {
+      console.error('Failed to fetch available questions:', error)
     }
   }
 
@@ -162,7 +283,7 @@ export default function RoomManagePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(roomFormData),
       })
 
       const data = await response.json()
@@ -171,11 +292,11 @@ export default function RoomManagePage() {
         throw new Error(data.error || 'Failed to update room')
       }
 
-      toast.success('Room updated successfully!')
-      await fetchRoom() // Refresh room data
+      alert('Room updated successfully!')
+      await fetchRoom()
     } catch (error) {
       console.error('Update room error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to update room')
+      alert(error instanceof Error ? error.message : 'Failed to update room')
     } finally {
       setIsUpdating(false)
     }
@@ -187,6 +308,9 @@ export default function RoomManagePage() {
     try {
       const response = await fetch(`/api/rooms/${roomId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
       })
 
       const data = await response.json()
@@ -195,16 +319,23 @@ export default function RoomManagePage() {
         throw new Error(data.error || 'Failed to delete room')
       }
 
-      toast.success('Room deleted successfully!')
+      alert('Room deleted successfully!')
       router.push('/dashboard')
     } catch (error) {
       console.error('Delete room error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to delete room')
+      alert(error instanceof Error ? error.message : 'Failed to delete room')
     }
   }
 
   const startRoom = async () => {
     if (!room) return
+
+    // Check if room has questions
+    if (roomQuestions.length === 0) {
+      alert('Cannot start room without questions. Please add questions first.')
+      setActiveTab('questions')
+      return
+    }
 
     try {
       const response = await fetch(`/api/rooms/${roomId}/start`, {
@@ -217,59 +348,189 @@ export default function RoomManagePage() {
         throw new Error(data.error || 'Failed to start room')
       }
 
-      toast.success('Room started successfully!')
+      alert('Room started successfully!')
       router.push(`/rooms/${roomId}/live`)
     } catch (error) {
       console.error('Start room error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to start room')
+      alert(error instanceof Error ? error.message : 'Failed to start room')
     }
+  }
+
+  const handleAddQuestions = async () => {
+    if (selectedQuestions.length === 0 || room?.status !== 'waiting') return
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionIds: selectedQuestions,
+          replaceAll: false
+        }),
+      })
+
+      if (response.ok) {
+        setSelectedQuestions([])
+        await Promise.all([
+          fetchRoomQuestions(),
+          fetchAvailableQuestions(),
+          fetchRoom()
+        ])
+        alert('Questions added successfully!')
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to add questions')
+      }
+    } catch (error) {
+      console.error('Add questions error:', error)
+      alert('Failed to add questions')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRemoveQuestion = async (questionId: string) => {
+    if (room?.status !== 'waiting' || !confirm('Remove this question from the room?')) return
+
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/questions?questionIds=${questionId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await Promise.all([
+          fetchRoomQuestions(),
+          fetchAvailableQuestions(),
+          fetchRoom()
+        ])
+        alert('Question removed successfully!')
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to remove question')
+      }
+    } catch (error) {
+      console.error('Remove question error:', error)
+      alert('Failed to remove question')
+    }
+  }
+
+  const handleCreateQuestion = async () => {
+    if (!formData.title || !formData.content || formData.options.some(opt => !opt.trim())) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch('/api/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setIsCreateDialogOpen(false)
+        resetQuestionForm()
+        
+        // Add the new question to room
+        await fetch(`/api/rooms/${roomId}/questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questionIds: [result.question.id],
+            replaceAll: false
+          }),
+        })
+
+        await Promise.all([
+          fetchRoomQuestions(),
+          fetchAvailableQuestions(),
+          fetchRoom()
+        ])
+        alert('Question created and added to room!')
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to create question')
+      }
+    } catch (error) {
+      console.error('Create question error:', error)
+      alert('Failed to create question')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const resetQuestionForm = () => {
+    setFormData({
+      title: '',
+      content: '',
+      options: ['', '', '', ''],
+      correctAnswer: 0,
+      difficulty: 'medium',
+      category: '',
+      explanation: '',
+      timeLimit: 30,
+      points: 1,
+      isPublic: false
+    })
   }
 
   const sendAlert = async () => {
     if (!alertMessage.trim()) {
-      toast.error('Please enter an alert message')
+      alert('Please enter an alert message')
       return
     }
 
     try {
-      const response = await fetch(`/api/rooms/${roomId}/alert`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: alertMessage }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send alert')
-      }
-
-      toast.success('Alert sent to all participants!')
+      // For now, just simulate sending alert since we don't have the API endpoint
+      alert('Alert functionality will be implemented with real-time features!')
       setAlertMessage('')
     } catch (error) {
       console.error('Send alert error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to send alert')
+      alert('Failed to send alert')
     }
   }
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast.success('Copied to clipboard!')
+      alert('Copied to clipboard!')
     } catch (err) {
       console.error('Failed to copy:', err)
-      toast.error('Failed to copy to clipboard')
+      alert('Failed to copy to clipboard')
     }
   }
 
-  const shareLink = `${window.location.origin}/rooms/join?code=${room?.code}`
+  const shareLink = typeof window !== 'undefined' ? `${window.location.origin}/rooms/join?code=${room?.code}` : ''
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-500/20 text-green-400 border-green-500/30'
+      case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+      case 'hard': return 'bg-red-500/20 text-red-400 border-red-500/30'
+      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+    }
+  }
+
+  const updateQuestionFormField = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const updateQuestionOption = (index: number, value: string) => {
+    const newOptions = [...formData.options]
+    newOptions[index] = value
+    setFormData(prev => ({ ...prev, options: newOptions }))
+  }
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
-        <div className="text-[#b388ff] text-xl">Loading room...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#b388ff] mx-auto mb-4"></div>
+          <div className="text-[#e0e0e0] text-lg">Loading room...</div>
+        </div>
       </div>
     )
   }
@@ -277,7 +538,16 @@ export default function RoomManagePage() {
   if (!room) {
     return (
       <div className="min-h-screen bg-[#1a1f2e] flex justify-center items-center">
-        <div className="text-red-400 text-xl">Room not found</div>
+        <Card className="bg-[#242b3d] border-red-500/20 max-w-md">
+          <CardContent className="p-6 text-center">
+            <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-[#e0e0e0] mb-2">Room Not Found</h3>
+            <p className="text-gray-400 mb-4">This room doesn&apos;t exist or you don&apos;t have permission to access it.</p>
+            <Button onClick={() => router.push('/dashboard')} className="bg-[#b388ff] hover:bg-[#9c5cff]">
+              Return to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -374,7 +644,7 @@ export default function RoomManagePage() {
               <CardContent className="p-4">
                 <div className="text-center">
                   <p className="text-sm text-gray-400">Questions</p>
-                  <p className="text-xl font-bold text-[#e0e0e0]">{room.statistics.totalQuestions}</p>
+                  <p className="text-xl font-bold text-[#e0e0e0]">{roomQuestions.length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -505,15 +775,21 @@ export default function RoomManagePage() {
                           className="w-full bg-blue-600 hover:bg-blue-700"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Manage Questions
+                          Manage Questions ({roomQuestions.length})
                         </Button>
                         <Button
                           onClick={startRoom}
                           className="w-full bg-green-600 hover:bg-green-700"
+                          disabled={roomQuestions.length === 0}
                         >
                           <Play className="h-4 w-4 mr-2" />
                           Start Room Now
                         </Button>
+                        {roomQuestions.length === 0 && (
+                          <p className="text-xs text-amber-400 text-center">
+                            Add questions before starting the room
+                          </p>
+                        )}
                       </>
                     )}
 
@@ -551,31 +827,6 @@ export default function RoomManagePage() {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Room Statistics */}
-            {room.status === 'completed' && (
-              <Card className="bg-[#242b3d] border-purple-500/20">
-                <CardHeader>
-                  <CardTitle className="text-xl text-[#b388ff]">Room Statistics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.averageScore}%</p>
-                      <p className="text-gray-400">Average Score</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.completionRate}%</p>
-                      <p className="text-gray-400">Completion Rate</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.totalQuestions}</p>
-                      <p className="text-gray-400">Total Questions</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* Participants Tab */}
@@ -646,15 +897,6 @@ export default function RoomManagePage() {
                     ))}
                   </div>
                 )}
-
-                {room.participants.length > 0 && (
-                  <div className="mt-6 pt-4 border-t border-gray-600">
-                    <Button className="w-full bg-[#b388ff] hover:bg-[#9c5cff]">
-                      <Download className="h-4 w-4 mr-2" />
-                      Export Participant List
-                    </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -696,18 +938,18 @@ export default function RoomManagePage() {
                       <Label htmlFor="title" className="text-[#e0e0e0]">Room Title</Label>
                       <Input
                         id="title"
-                        value={formData.title}
-                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                        value={roomFormData.title}
+                        onChange={(e) => setRoomFormData(prev => ({ ...prev, title: e.target.value }))}
                         className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
                       />
                     </div>
 
                     <div>
                       <Label htmlFor="description" className="text-[#e0e0e0]">Description</Label>
-                      <Input
+                      <Textarea
                         id="description"
-                        value={formData.description}
-                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        value={roomFormData.description}
+                        onChange={(e) => setRoomFormData(prev => ({ ...prev, description: e.target.value }))}
                         className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
                       />
                     </div>
@@ -720,8 +962,8 @@ export default function RoomManagePage() {
                           type="number"
                           min="2"
                           max="1000"
-                          value={formData.maxParticipants}
-                          onChange={(e) => setFormData(prev => ({ ...prev, maxParticipants: parseInt(e.target.value) || 2 }))}
+                          value={roomFormData.maxParticipants}
+                          onChange={(e) => setRoomFormData(prev => ({ ...prev, maxParticipants: parseInt(e.target.value) || 2 }))}
                           className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
                         />
                       </div>
@@ -733,8 +975,8 @@ export default function RoomManagePage() {
                           type="number"
                           min="5"
                           max="180"
-                          value={formData.timeLimit}
-                          onChange={(e) => setFormData(prev => ({ ...prev, timeLimit: parseInt(e.target.value) || 5 }))}
+                          value={roomFormData.timeLimit}
+                          onChange={(e) => setRoomFormData(prev => ({ ...prev, timeLimit: parseInt(e.target.value) || 5 }))}
                           className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
                         />
                       </div>
@@ -752,8 +994,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Allow anyone to discover and join this room</p>
                         </div>
                         <Switch
-                          checked={formData.isPublic}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isPublic: checked }))}
+                          checked={roomFormData.isPublic}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, isPublic: checked }))}
                         />
                       </div>
 
@@ -763,8 +1005,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Participants can join after the quiz has started</p>
                         </div>
                         <Switch
-                          checked={formData.allowLateJoin}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allowLateJoin: checked }))}
+                          checked={roomFormData.allowLateJoin}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, allowLateJoin: checked }))}
                         />
                       </div>
 
@@ -774,8 +1016,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Display live rankings to participants</p>
                         </div>
                         <Switch
-                          checked={formData.showLeaderboard}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showLeaderboard: checked }))}
+                          checked={roomFormData.showLeaderboard}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, showLeaderboard: checked }))}
                         />
                       </div>
 
@@ -785,8 +1027,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Randomize question order for each participant</p>
                         </div>
                         <Switch
-                          checked={formData.shuffleQuestions}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, shuffleQuestions: checked }))}
+                          checked={roomFormData.shuffleQuestions}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, shuffleQuestions: checked }))}
                         />
                       </div>
                     </div>
@@ -803,8 +1045,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Enable participant chat during quiz</p>
                         </div>
                         <Switch
-                          checked={formData.settings.allowChat}
-                          onCheckedChange={(checked) => setFormData(prev => ({
+                          checked={roomFormData.settings.allowChat}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({
                             ...prev,
                             settings: { ...prev.settings, allowChat: checked }
                           }))}
@@ -817,8 +1059,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Display correct answers after each question</p>
                         </div>
                         <Switch
-                          checked={formData.settings.showCorrectAnswers}
-                          onCheckedChange={(checked) => setFormData(prev => ({
+                          checked={roomFormData.settings.showCorrectAnswers}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({
                             ...prev,
                             settings: { ...prev.settings, showCorrectAnswers: checked }
                           }))}
@@ -831,8 +1073,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Show if answer is correct immediately</p>
                         </div>
                         <Switch
-                          checked={formData.settings.instantFeedback}
-                          onCheckedChange={(checked) => setFormData(prev => ({
+                          checked={roomFormData.settings.instantFeedback}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({
                             ...prev,
                             settings: { ...prev.settings, instantFeedback: checked }
                           }))}
@@ -845,8 +1087,8 @@ export default function RoomManagePage() {
                           <p className="text-sm text-gray-400">Participants can skip difficult questions</p>
                         </div>
                         <Switch
-                          checked={formData.settings.allowQuestionSkip}
-                          onCheckedChange={(checked) => setFormData(prev => ({
+                          checked={roomFormData.settings.allowQuestionSkip}
+                          onCheckedChange={(checked) => setRoomFormData(prev => ({
                             ...prev,
                             settings: { ...prev.settings, allowQuestionSkip: checked }
                           }))}
@@ -861,22 +1103,401 @@ export default function RoomManagePage() {
 
           {/* Questions Tab */}
           <TabsContent value="questions" className="space-y-6">
-            <Card className="bg-[#242b3d] border-purple-500/20">
-              <CardHeader>
-                <CardTitle className="text-xl text-[#b388ff]">Quiz Questions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-400">
-                  <Plus className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No questions added yet</h3>
-                  <p className="mb-6">Add questions to make your quiz interactive</p>
-                  <Button className="bg-[#b388ff] hover:bg-[#9c5cff]">
-                    <Plus className="h-4 w-4 mr-2" />
+            <div className="space-y-6">
+              <Tabs defaultValue="room-questions" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-2 bg-[#242b3d]">
+                  <TabsTrigger value="room-questions" className="data-[state=active]:bg-[#b388ff]">
+                    Room Questions ({roomQuestions.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="add-questions" className="data-[state=active]:bg-[#b388ff]">
                     Add Questions
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Room Questions Tab */}
+                <TabsContent value="room-questions" className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-[#e0e0e0]">Current Questions</h3>
+                    {room.status === 'waiting' && (
+                      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            className="bg-[#b388ff] hover:bg-[#9c5cff] text-white"
+                            onClick={resetQuestionForm}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create New Question
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-[#242b3d] border-purple-500/20 max-w-2xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle className="text-[#b388ff]">Create New Question</DialogTitle>
+                          </DialogHeader>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <Label className="text-[#e0e0e0]">Question Title *</Label>
+                              <Input
+                                value={formData.title}
+                                onChange={(e) => updateQuestionFormField('title', e.target.value)}
+                                placeholder="Enter question title"
+                                className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-[#e0e0e0]">Question Content *</Label>
+                              <Textarea
+                                value={formData.content}
+                                onChange={(e) => updateQuestionFormField('content', e.target.value)}
+                                placeholder="Enter the question content"
+                                className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                                rows={3}
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-[#e0e0e0]">Answer Options *</Label>
+                              <RadioGroup 
+                                value={formData.correctAnswer.toString()} 
+                                onValueChange={(value) => updateQuestionFormField('correctAnswer', parseInt(value))}
+                                className="space-y-2"
+                              >
+                                {formData.options.map((option, index) => (
+                                  <div key={index} className="flex items-center space-x-2">
+                                    <RadioGroupItem 
+                                      value={index.toString()} 
+                                      id={`option-${index}`}
+                                      className="text-[#b388ff]"
+                                    />
+                                    <Input
+                                      value={option}
+                                      onChange={(e) => updateQuestionOption(index, e.target.value)}
+                                      placeholder={`Option ${index + 1}`}
+                                      className="flex-1 bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                                    />
+                                    <Label htmlFor={`option-${index}`} className="text-xs text-gray-400">
+                                      Correct
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-[#e0e0e0]">Category *</Label>
+                                <select
+                                  value={formData.category}
+                                  onChange={(e) => updateQuestionFormField('category', e.target.value)}
+                                  className="w-full px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0]"
+                                >
+                                  <option value="">Select category</option>
+                                  {CATEGORIES.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <Label className="text-[#e0e0e0]">Difficulty</Label>
+                                <select
+                                  value={formData.difficulty}
+                                  onChange={(e) => updateQuestionFormField('difficulty', e.target.value)}
+                                  className="w-full px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0]"
+                                >
+                                  <option value="easy">Easy</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="hard">Hard</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-[#e0e0e0]">Time Limit (seconds)</Label>
+                                <Input
+                                  type="number"
+                                  value={formData.timeLimit}
+                                  onChange={(e) => updateQuestionFormField('timeLimit', parseInt(e.target.value) || 30)}
+                                  className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-[#e0e0e0]">Points</Label>
+                                <Input
+                                  type="number"
+                                  value={formData.points}
+                                  onChange={(e) => updateQuestionFormField('points', parseInt(e.target.value) || 1)}
+                                  className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <Label className="text-[#e0e0e0]">Explanation (Optional)</Label>
+                              <Textarea
+                                value={formData.explanation}
+                                onChange={(e) => updateQuestionFormField('explanation', e.target.value)}
+                                placeholder="Explain why this is the correct answer"
+                                className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                                rows={2}
+                              />
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="isPublic"
+                                checked={formData.isPublic}
+                                onChange={(e) => updateQuestionFormField('isPublic', e.target.checked)}
+                                className="rounded border-purple-500/20"
+                              />
+                              <Label htmlFor="isPublic" className="text-[#e0e0e0]">
+                                Make this question public
+                              </Label>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                              <Button
+                                onClick={handleCreateQuestion}
+                                disabled={isSubmitting}
+                                className="flex-1 bg-[#b388ff] hover:bg-[#9c5cff] text-white"
+                              >
+                                {isSubmitting ? 'Creating...' : 'Create & Add to Room'}
+                              </Button>
+                              <Button
+                                onClick={() => setIsCreateDialogOpen(false)}
+                                variant="outline"
+                                className="border-purple-500/30 text-[#e0e0e0] hover:bg-purple-500/10"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </div>
+
+                  {questionsLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b388ff] mx-auto mb-4"></div>
+                      <p className="text-gray-400">Loading questions...</p>
+                    </div>
+                  ) : roomQuestions.length === 0 ? (
+                    <Card className="bg-[#242b3d] border-purple-500/20">
+                      <CardContent className="py-8 text-center">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400 opacity-50" />
+                        <h3 className="text-lg font-medium text-[#e0e0e0] mb-2">No questions added yet</h3>
+                        <p className="text-gray-400 mb-4">Add questions from your question bank or create new ones</p>
+                        {room.status === 'waiting' && (
+                          <div className="flex gap-3 justify-center">
+                            <Button
+                              onClick={() => setIsCreateDialogOpen(true)}
+                              className="bg-[#b388ff] hover:bg-[#9c5cff]"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Question
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {roomQuestions.map((question, index) => (
+                        <Card key={question.id} className="bg-[#242b3d] border-purple-500/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="bg-[#b388ff] text-white px-2 py-1 rounded text-sm font-medium">
+                                    {index + 1}
+                                  </span>
+                                  <h4 className="font-medium text-[#e0e0e0]">{question.title}</h4>
+                                </div>
+                                <p className="text-gray-400 text-sm mb-3">{question.content}</p>
+                                <div className="flex items-center gap-4">
+                                  <Badge className={getDifficultyColor(question.difficulty)}>
+                                    {question.difficulty}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[#e0e0e0] border-gray-500/30">
+                                    {question.category}
+                                  </Badge>
+                                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                                    <Clock className="h-3 w-3" />
+                                    {question.timeLimit}s
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                                    <BookOpen className="h-3 w-3" />
+                                    {question.points}pts
+                                  </div>
+                                </div>
+                              </div>
+                              {room.status === 'waiting' && (
+                                <Button
+                                  onClick={() => handleRemoveQuestion(question.id)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Add Questions Tab */}
+                <TabsContent value="add-questions" className="space-y-4">
+                  {room.status !== 'waiting' ? (
+                    <Card className="bg-[#242b3d] border-amber-500/20">
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-3 text-amber-400">
+                          <AlertTriangle className="h-6 w-6" />
+                          <div>
+                            <h3 className="font-semibold">Questions Locked</h3>
+                            <p className="text-sm">Questions cannot be modified after the quiz has started.</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-[#e0e0e0]">Available Questions</h3>
+                        {selectedQuestions.length > 0 && (
+                          <Button
+                            onClick={handleAddQuestions}
+                            disabled={isSubmitting}
+                            className="bg-[#b388ff] hover:bg-[#9c5cff] text-white"
+                          >
+                            {isSubmitting ? 'Adding...' : `Add ${selectedQuestions.length} Questions`}
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Search and Filters */}
+                      <Card className="bg-[#242b3d] border-purple-500/20">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col lg:flex-row gap-4">
+                            <div className="relative flex-1">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <Input
+                                placeholder="Search questions..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
+                              />
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <select
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                className="px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0] text-sm"
+                              >
+                                <option value="all">All Questions</option>
+                                <option value="my">My Questions</option>
+                                <option value="public">Public Questions</option>
+                              </select>
+
+                              <select
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                className="px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0] text-sm"
+                              >
+                                <option value="">All Categories</option>
+                                {CATEGORIES.map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
+
+                              <select
+                                value={difficultyFilter}
+                                onChange={(e) => setDifficultyFilter(e.target.value)}
+                                className="px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0] text-sm"
+                              >
+                                <option value="">All Difficulties</option>
+                                <option value="easy">Easy</option>
+                                <option value="medium">Medium</option>
+                                <option value="hard">Hard</option>
+                              </select>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Questions List */}
+                      {availableQuestions.length === 0 ? (
+                        <Card className="bg-[#242b3d] border-purple-500/20">
+                          <CardContent className="py-8 text-center">
+                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400 opacity-50" />
+                            <h3 className="text-lg font-medium text-[#e0e0e0] mb-2">No questions found</h3>
+                            <p className="text-gray-400">Try adjusting your filters or create new questions</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="space-y-3">
+                          {availableQuestions.map((question) => (
+                            <Card 
+                              key={question.id} 
+                              className={`bg-[#242b3d] border-purple-500/20 cursor-pointer transition-colors ${
+                                selectedQuestions.includes(question.id) ? 'ring-2 ring-[#b388ff]' : 'hover:border-purple-500/40'
+                              }`}
+                              onClick={() => {
+                                setSelectedQuestions(prev => 
+                                  prev.includes(question.id) 
+                                    ? prev.filter(id => id !== question.id)
+                                    : [...prev, question.id]
+                                )
+                              }}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${
+                                        selectedQuestions.includes(question.id)
+                                          ? 'bg-[#b388ff] border-[#b388ff] text-white'
+                                          : 'border-gray-500'
+                                      }`}>
+                                        {selectedQuestions.includes(question.id) && <CheckCircle2 className="h-4 w-4" />}
+                                      </div>
+                                      <h4 className="font-medium text-[#e0e0e0]">{question.title}</h4>
+                                    </div>
+                                    <p className="text-gray-400 text-sm mb-3 ml-9">{question.content}</p>
+                                    <div className="flex items-center gap-4 ml-9">
+                                      <Badge className={getDifficultyColor(question.difficulty)}>
+                                        {question.difficulty}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-[#e0e0e0] border-gray-500/30">
+                                        {question.category}
+                                      </Badge>
+                                      <span className="text-xs text-gray-400">By {question.creatorName}</span>
+                                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                                        <Clock className="h-3 w-3" />
+                                        {question.timeLimit || 30}s
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
           </TabsContent>
 
           {/* Analytics Tab */}
@@ -886,11 +1507,40 @@ export default function RoomManagePage() {
                 <CardTitle className="text-xl text-[#b388ff]">Room Analytics</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-gray-400">
-                  <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">Analytics available after quiz completion</h3>
-                  <p>Detailed analytics will be shown here once the quiz is completed</p>
-                </div>
+                {room.status === 'completed' ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.averageScore}%</p>
+                        <p className="text-gray-400">Average Score</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.completionRate}%</p>
+                        <p className="text-gray-400">Completion Rate</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.totalQuestions}</p>
+                        <p className="text-gray-400">Total Questions</p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <Button
+                        onClick={() => router.push(`/rooms/${roomId}/results`)}
+                        className="bg-[#b388ff] hover:bg-[#9c5cff]"
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        View Detailed Results
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">Analytics available after quiz completion</h3>
+                    <p>Detailed analytics will be shown here once the quiz is completed</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -908,7 +1558,7 @@ export default function RoomManagePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-[#e0e0e0]">
-                  Are you sure you want to delete this room? This action cannot be undone.
+                  Are you sure you want to delete this room? This action cannot be undone and will remove all associated data.
                 </p>
                 <div className="flex gap-3">
                   <Button
@@ -919,7 +1569,10 @@ export default function RoomManagePage() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={deleteRoom}
+                    onClick={() => {
+                      setShowDeleteConfirm(false)
+                      deleteRoom()
+                    }}
                     className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                   >
                     Delete Room

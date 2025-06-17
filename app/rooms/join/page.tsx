@@ -12,7 +12,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, Users, Clock, Calendar, Filter, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { toast } from "sonner"
 
 interface Room {
   id: string
@@ -113,12 +112,12 @@ export default function JoinRoomPage() {
         setRoomPreview(data.room)
       } else {
         setRoomPreview(null)
-        toast.error(data.error || 'Room not found')
+        alert(data.error || 'Room not found')
       }
     } catch (error) {
       console.error('Room check error:', error)
       setRoomPreview(null)
-      toast.error('Failed to check room')
+      alert('Failed to check room')
     } finally {
       setIsLoading(false)
     }
@@ -128,17 +127,24 @@ export default function JoinRoomPage() {
     const codeToJoin = targetRoomCode || roomCode
     
     if (!codeToJoin) {
-      toast.error('Please enter a room code')
+      alert('Please enter a room code')
       return
     }
 
     if (!session && !userName.trim()) {
-      toast.error('Please enter your name to join as a guest')
+      alert('Please enter your name to join as a guest')
       return
     }
 
     setIsJoining(true)
     try {
+      // Store guest participant ID if not authenticated
+      if (!session && userName.trim()) {
+        const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        localStorage.setItem('guestParticipantId', guestId)
+        localStorage.setItem('guestUserName', userName.trim())
+      }
+
       const response = await fetch('/api/rooms/join', {
         method: 'POST',
         headers: {
@@ -156,11 +162,19 @@ export default function JoinRoomPage() {
         throw new Error(data.error || 'Failed to join room')
       }
 
-      toast.success('Successfully joined the room!')
-      router.push(`/rooms/${data.room.id}/quiz`)
+      alert('Successfully joined the room!')
+      
+      // Navigate to quiz page based on room status
+      if (data.room.status === 'waiting') {
+        router.push(`/rooms/${data.room.id}/waiting`)
+      } else if (data.room.status === 'active') {
+        router.push(`/rooms/${data.room.id}/quiz`)
+      } else {
+        router.push(`/rooms/${data.room.id}/results`)
+      }
     } catch (error) {
       console.error('Join room error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to join room')
+      alert(error instanceof Error ? error.message : 'Failed to join room')
     } finally {
       setIsJoining(false)
     }
@@ -350,7 +364,7 @@ export default function JoinRoomPage() {
                           <div className="mt-3 p-2 bg-red-500/10 rounded border border-red-500/20">
                             <div className="flex items-center gap-2 text-red-400">
                               <AlertCircle className="h-4 w-4" />
-                              <span className="text-sm">This room is active and doesn&#39;t allow late joining</span>
+                              <span className="text-sm">This room is active and doesn't allow late joining</span>
                             </div>
                           </div>
                         )}
