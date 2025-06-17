@@ -101,84 +101,84 @@ export default function JoinRoomPage() {
   }
 
   const checkRoom = async (code: string) => {
-    if (!code || code.length !== 6) return
+  if (!code || code.length !== 6) return
 
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/rooms/join?code=${code.toUpperCase()}`)
-      const data = await response.json()
+  setIsLoading(true)
+  try {
+    const response = await fetch(`/api/rooms/join?code=${code.toUpperCase()}`)
+    const data = await response.json()
 
-      if (response.ok && data.success) {
-        setRoomPreview(data.room)
-      } else {
-        setRoomPreview(null)
-        alert(data.error || 'Room not found')
-      }
-    } catch (error) {
-      console.error('Room check error:', error)
+    if (response.ok && data.success) {
+      setRoomPreview(data.room)
+    } else {
       setRoomPreview(null)
-      alert('Failed to check room')
-    } finally {
-      setIsLoading(false)
+      alert(data.error || 'Room not found')
     }
+  } catch (error) {
+    console.error('Room check error:', error)
+    setRoomPreview(null)
+    alert('Failed to check room')
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const joinRoom = async (targetRoomCode?: string) => {
-    const codeToJoin = targetRoomCode || roomCode
-    
-    if (!codeToJoin) {
-      alert('Please enter a room code')
-      return
-    }
-
-    if (!session && !userName.trim()) {
-      alert('Please enter your name to join as a guest')
-      return
-    }
-
-    setIsJoining(true)
-    try {
-      // Store guest participant ID if not authenticated
-      if (!session && userName.trim()) {
-        const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        localStorage.setItem('guestParticipantId', guestId)
-        localStorage.setItem('guestUserName', userName.trim())
-      }
-
-      const response = await fetch('/api/rooms/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomCode: codeToJoin.toUpperCase(),
-          userName: userName.trim(),
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to join room')
-      }
-
-      alert('Successfully joined the room!')
-      
-      // Navigate to quiz page based on room status
-      if (data.room.status === 'waiting') {
-        router.push(`/rooms/${data.room.id}/waiting`)
-      } else if (data.room.status === 'active') {
-        router.push(`/rooms/${data.room.id}/quiz`)
-      } else {
-        router.push(`/rooms/${data.room.id}/results`)
-      }
-    } catch (error) {
-      console.error('Join room error:', error)
-      alert(error instanceof Error ? error.message : 'Failed to join room')
-    } finally {
-      setIsJoining(false)
-    }
+  const codeToJoin = targetRoomCode || roomCode
+  
+  if (!codeToJoin) {
+    alert('Please enter a room code')
+    return
   }
+
+  if (!session && !userName.trim()) {
+    alert('Please enter your name to join as a guest')
+    return
+  }
+
+  setIsJoining(true)
+  try {
+    // Store guest participant ID if not authenticated
+    if (!session && userName.trim()) {
+      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      localStorage.setItem('guestParticipantId', guestId)
+      localStorage.setItem('guestUserName', userName.trim())
+    }
+
+    const response = await fetch('/api/rooms/join', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        roomCode: codeToJoin.toUpperCase(),
+        userName: userName.trim(),
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to join room')
+    }
+
+    alert('Successfully joined the room!')
+    
+    // Navigate to quiz page based on room status
+    if (data.room.status === 'waiting') {
+      router.push(`/rooms/${data.room.id}/waiting`)
+    } else if (data.room.status === 'active') {
+      router.push(`/rooms/${data.room.id}/quiz`)
+    } else {
+      router.push(`/rooms/${data.room.id}/results`)
+    }
+  } catch (error) {
+    console.error('Join room error:', error)
+    alert(error instanceof Error ? error.message : 'Failed to join room')
+  } finally {
+    setIsJoining(false)
+  }
+}
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -364,7 +364,7 @@ export default function JoinRoomPage() {
                           <div className="mt-3 p-2 bg-red-500/10 rounded border border-red-500/20">
                             <div className="flex items-center gap-2 text-red-400">
                               <AlertCircle className="h-4 w-4" />
-                              <span className="text-sm">This room is active and doesn't allow late joining</span>
+                              <span className="text-sm">This room is active and doesn&apos;t allow late joining</span>
                             </div>
                           </div>
                         )}

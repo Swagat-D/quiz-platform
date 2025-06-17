@@ -9,12 +9,20 @@ interface JoinRoomRequest {
   userName?: string; // For guest users
 }
 
+// Fix the room join API to handle case-insensitive search
+// Update app/api/rooms/join/route.ts POST method:
+
 export async function POST(req: Request) {
   try {
+    console.log('Join room API called');
+    
     const session = await getServerSession(authOptions);
     const body: JoinRoomRequest = await req.json();
     
+    console.log('Request body:', body);
+    
     if (!body.roomCode) {
+      console.log('Missing room code');
       return NextResponse.json(
         { error: "Room code is required" },
         { status: 400 }
@@ -23,17 +31,21 @@ export async function POST(req: Request) {
 
     const db = await getDb();
     
-    // Find the room
+    // Use case-insensitive search for room codes
+    console.log('Looking for room with code (case-insensitive):', body.roomCode);
     const room = await db.collection('rooms').findOne({ 
-      code: body.roomCode.toUpperCase() 
+      code: { $regex: new RegExp(`^${body.roomCode}$`, 'i') }
     });
 
     if (!room) {
+      console.log('Room not found for code:', body.roomCode);
       return NextResponse.json(
-        { error: "Room not found" },
+        { error: "Room not found. Please check the room code and try again." },
         { status: 404 }
       );
     }
+
+    console.log('Found room:', room.title, 'Status:', room.status, 'Stored code:', room.code);
 
     // Check room status
     if (room.status === 'completed') {
@@ -75,10 +87,29 @@ export async function POST(req: Request) {
     );
 
     if (existingParticipant) {
-      return NextResponse.json(
-        { error: "You are already in this room" },
-        { status: 400 }
-      );
+      console.log('User already in room, returning existing room data');
+      return NextResponse.json({
+        success: true,
+        room: {
+          id: room._id.toString(),
+          code: room.code,
+          title: room.title,
+          description: room.description,
+          status: room.status,
+          currentParticipants: room.currentParticipants,
+          maxParticipants: room.maxParticipants,
+          creatorName: room.creatorName,
+          allowLateJoin: room.allowLateJoin,
+          showLeaderboard: room.showLeaderboard,
+          timeLimit: room.timeLimit,
+          settings: room.settings,
+        },
+        participant: {
+          userName: existingParticipant.userName,
+          isAuthenticated: existingParticipant.isAuthenticated,
+          joinedAt: existingParticipant.joinedAt,
+        }
+      });
     }
 
     // Add participant to room
@@ -93,6 +124,8 @@ export async function POST(req: Request) {
       answeredQuestions: 0,
       lastActivity: new Date(),
     };
+
+    console.log('Adding participant:', participant.userName);
 
     await db.collection('rooms').updateOne(
       { _id: room._id },
@@ -117,31 +150,23 @@ export async function POST(req: Request) {
       timestamp: new Date(),
     });
 
-    // Get updated room data
-    const updatedRoom = await db.collection('rooms').findOne({ _id: room._id });
-
-    if (!updatedRoom) {
-      return NextResponse.json(
-        { error: "Failed to retrieve updated room information" },
-        { status: 500 }
-      );
-    }
+    console.log('Successfully joined room');
 
     return NextResponse.json({
       success: true,
       room: {
-        id: updatedRoom._id.toString(),
-        code: updatedRoom.code,
-        title: updatedRoom.title,
-        description: updatedRoom.description,
-        status: updatedRoom.status,
-        currentParticipants: updatedRoom.currentParticipants,
-        maxParticipants: updatedRoom.maxParticipants,
-        creatorName: updatedRoom.creatorName,
-        allowLateJoin: updatedRoom.allowLateJoin,
-        showLeaderboard: updatedRoom.showLeaderboard,
-        timeLimit: updatedRoom.timeLimit,
-        settings: updatedRoom.settings,
+        id: room._id.toString(),
+        code: room.code,
+        title: room.title,
+        description: room.description,
+        status: room.status,
+        currentParticipants: room.currentParticipants + 1,
+        maxParticipants: room.maxParticipants,
+        creatorName: room.creatorName,
+        allowLateJoin: room.allowLateJoin,
+        showLeaderboard: room.showLeaderboard,
+        timeLimit: room.timeLimit,
+        settings: room.settings,
       },
       participant: {
         userName: userName,

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getDb } from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
 
 // GET - List user's rooms or public rooms
 export async function GET(req: Request) {
@@ -21,18 +20,51 @@ export async function GET(req: Request) {
     const db = await getDb();
     const skip = (page - 1) * limit;
 
-    const query: Record<string, unknown> = {};
+    const query: Record<string, any> = {};
     const sort: Record<string, 1 | -1> = { createdAt: -1 };
 
     // Build query based on type
     if (type === 'my' && session?.user?.id) {
-      query.creatorId = session.user.id;
-    } else if (type === 'public') {
-      query.isPublic = true;
-      query.status = { $in: ['waiting', 'active'] };
-    } else if (type === 'joined' && session?.user?.id) {
-      query['participants.userId'] = session.user.id;
-    }
+  query.creatorId = session.user.id;
+} else if (type === 'public') {
+  query.isPublic = true;
+  // Only show waiting and active public rooms, exclude cancelled ones
+  query.status = { $in: ['waiting', 'active'] };
+} else if (type === 'joined' && session?.user?.id) {
+  query['participants.userId'] = session.user.id;
+} else if (!session?.user?.id && type === 'public') {
+  // For unauthenticated users, only show public rooms
+  query.isPublic = true;
+  query.status = { $in: ['waiting', 'active'] };
+}
+
+
+    if (search) {
+  const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  (query.$and = (query.$and as any[] || []));
+  (query.$and as any[]).push({
+    $or: [
+      { title: searchRegex },
+      { description: searchRegex },
+      { code: searchRegex },
+      { category: searchRegex }
+    ]
+  });
+}
+
+if (status && type !== 'public') {
+  // Don't override status filter for public rooms
+  query.status = status;
+}
+
+if (category) {
+  query.category = category;
+}
+
+if (difficulty) {
+  query.difficulty = difficulty;
+}
+
 
     // Add filters
     if (search) {

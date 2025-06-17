@@ -14,7 +14,7 @@ interface RouteParams {
 // GET single room
 export async function GET(req: Request, { params }: RouteParams) {
   try {
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!ObjectId.isValid(roomId)) {
       return NextResponse.json(
@@ -78,7 +78,7 @@ export async function GET(req: Request, { params }: RouteParams) {
 export async function PUT(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -168,7 +168,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -200,37 +200,41 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     }
 
     // Can only delete rooms that haven't started or are completed
-    if (room.status === 'active') {
+    if (room.status === 'active' || room.status === 'paused') {
       return NextResponse.json(
         { error: "Cannot delete active room. Please end the room first." },
         { status: 400 }
       );
     }
 
-    // Soft delete by updating status
-    await db.collection('rooms').updateOne(
-      { _id: new ObjectId(roomId) },
-      { 
-        $set: { 
-          status: 'cancelled',
-          updatedAt: new Date(),
-          deletedAt: new Date()
-        } 
-      }
-    );
+    // Delete related data first
+    await Promise.all([
+      // Delete room questions
+      db.collection('roomQuestions').deleteMany({ roomId: roomId }),
+      // Delete participant answers
+      db.collection('participantAnswers').deleteMany({ roomId: roomId }),
+      // Delete room activities
+      db.collection('roomActivities').deleteMany({ roomId: roomId }),
+      // Delete room sessions
+      db.collection('roomSessions').deleteMany({ roomId: roomId })
+    ]);
 
-    // Log activity
-    await db.collection('roomActivities').insertOne({
-      roomId: roomId,
-      roomCode: room.code,
-      userId: session.user.id,
-      userName: session.user.name,
-      action: 'room_deleted',
-      details: {},
-      timestamp: new Date(),
+    // Finally delete the room itself
+    const deleteResult = await db.collection('rooms').deleteOne({ 
+      _id: new ObjectId(roomId) 
     });
 
-    return NextResponse.json({ success: true });
+    if (deleteResult.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "Failed to delete room" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "Room deleted successfully" 
+    });
 
   } catch (error) {
     console.error("Delete room error:", error);

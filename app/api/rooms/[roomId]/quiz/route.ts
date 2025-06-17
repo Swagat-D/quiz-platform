@@ -15,7 +15,7 @@ interface RouteParams {
 export async function GET(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     const { searchParams } = new URL(req.url);
     const participantId = searchParams.get('participantId');
     
@@ -164,7 +164,7 @@ export async function GET(req: Request, { params }: RouteParams) {
 export async function POST(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     const body = await req.json();
     const { questionId, selectedAnswer, timeSpent, participantId } = body;

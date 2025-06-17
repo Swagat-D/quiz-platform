@@ -15,7 +15,7 @@ interface RouteParams {
 export async function GET(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!ObjectId.isValid(roomId)) {
       return NextResponse.json(
@@ -97,7 +97,7 @@ export async function GET(req: Request, { params }: RouteParams) {
 export async function POST(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -217,7 +217,7 @@ export async function POST(req: Request, { params }: RouteParams) {
 export async function PUT(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -304,7 +304,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    const { roomId } = params;
+    const { roomId } = await params;
     
     if (!session?.user?.id) {
       return NextResponse.json(
