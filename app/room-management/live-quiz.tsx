@@ -24,14 +24,14 @@ interface LiveQuizProps {
 }
 
 // Simulated backend function
-const fetchQuestions = async (roomCode: string): Promise<Question[]> => {
+const fetchQuestions = async (savedQuestions: Question[]): Promise<Question[]> => {
   // In a real app, this would be an API call
   return new Promise((resolve) => {
     setTimeout(() => resolve(savedQuestions), 1000);
   });
 };
 
-export default function LiveQuiz({ roomCode, onClose, savedQuestions }: LiveQuizProps) {
+export default function LiveQuiz({ onClose, savedQuestions }: LiveQuizProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [timeLeft, setTimeLeft] = useState(30)
@@ -44,9 +44,9 @@ export default function LiveQuiz({ roomCode, onClose, savedQuestions }: LiveQuiz
   const currentQuestion = questions[currentQuestionIndex]
 
   const fetchQuestionsData = useCallback(async () => {
-    const fetchedQuestions = await fetchQuestions(roomCode);
+    const fetchedQuestions = await fetchQuestions(savedQuestions);
     setQuestions(fetchedQuestions);
-  }, [roomCode]);
+  }, [savedQuestions]);
 
   useEffect(() => {
     fetchQuestionsData();

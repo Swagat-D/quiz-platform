@@ -4,7 +4,6 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getDb } from "@/lib/mongodb";
 import { generateRoomCode } from "@/utils/generate-room-code";
-import { ObjectId } from "mongodb";
 
 interface CreateRoomRequest {
   title: string;

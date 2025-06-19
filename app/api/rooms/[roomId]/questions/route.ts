@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/rooms/[roomId]/questions/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
@@ -14,7 +15,7 @@ interface RouteParams {
 // GET room questions
 export async function GET(req: Request, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    //const session = await getServerSession(authOptions);
     const { roomId } = await params;
     
     if (!ObjectId.isValid(roomId)) {

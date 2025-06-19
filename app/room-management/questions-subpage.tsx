@@ -18,7 +18,6 @@ interface QuestionsSubpageProps {
 }
 
 export default function QuestionsSubpage({ onClose }: QuestionsSubpageProps) {
-  const [questions, setQuestions] = useState<Question[]>([])
   const [newQuestion, setNewQuestion] = useState<Question>({
     id: '',
     text: '',
@@ -175,7 +174,7 @@ export default function QuestionsSubpage({ onClose }: QuestionsSubpageProps) {
               <h3 className="text-xl font-semibold text-purple-400 mb-2 hidden lg:block">Other Questions</h3>
               <ScrollArea className="flex-grow pr-4 border border-purple-500/20 rounded-lg h-[calc(100vh-600px)] min-h-[300px]">
                 <div className="space-y-4 p-4">
-                  {savedQuestions.map((question, index) => (
+                  {savedQuestions.map((question) => (
                     <div key={question.id} className="bg-[#242b3d] p-4 rounded-lg border border-purple-500/20 shadow-md transition-all duration-300 hover:shadow-lg hover:border-purple-500/50">
                       <div className="flex justify-between items-start">
                         <h3 className="font-semibold text-purple-400 mb-2 text-lg">{question.text}</h3>

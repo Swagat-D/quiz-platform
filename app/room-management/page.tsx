@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Copy, Share2, PlayCircle, AlertCircle, MessageSquare, XCircle, ClipboardCopy, Edit, Zap } from 'lucide-react'
+import { Copy, Share2, PlayCircle, AlertCircle, MessageSquare, XCircle, ClipboardCopy, Edit } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import Navbar from '@/components/navbar'
@@ -12,11 +12,10 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { WhatsappIcon, TwitterIcon, FacebookIcon, LinkedinIcon, EmailIcon } from 'react-share'
 
 type Question = {
-  id: number;
+  id: string;
   text: string;
   options: string[];
-  correctAnswer: string;
-  difficulty: string;
+  correctOption: number;
 };
 
 
@@ -26,7 +25,7 @@ export default function RoomManagement() {
   const [showLiveQuiz, setShowLiveQuiz] = useState(false)
   const [showParticipants, setShowParticipants] = useState(false)
   const [showQuestions, setShowQuestions] = useState(false) // Added state for showing questions
-  const [savedQuestions, setSavedQuestions] = useState<Question[]>([])
+  const [savedQuestions] = useState<Question[]>([])
   const roomCode = 'o38nyw'
   const shareLink = `https://devquizware.com/join/${roomCode}`
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/rooms/join/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";

@@ -181,7 +181,7 @@ export default function LandingPage() {
                       <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
                     ))}
                   </div>
-                  <p className="text-gray-300 mb-6 italic">&quot;{testimonial.content}"</p>
+                  <p className="text-gray-300 mb-6 italic">&quot;{testimonial.content}&quot;</p>
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
                       <span className="text-white font-semibold">{testimonial.name[0]}</span>

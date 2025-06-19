@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/rooms/[roomId]/start/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
@@ -289,7 +290,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
         
         // Calculate averages
         const questionCount = await db.collection('roomQuestions').countDocuments({ roomId: roomId });
-        participantScores.forEach((stats, participantId) => {
+        participantScores.forEach((stats) => {
           if (stats.answered > 0) {
             completedParticipants++;
             totalScore += (stats.score / questionCount) * 100; // Convert to percentage
@@ -419,7 +420,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
 // GET - Get room status for live updates
 export async function GET(req: Request, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    //const session = await getServerSession(authOptions);
     const { roomId } = await params;
     
     if (!ObjectId.isValid(roomId)) {

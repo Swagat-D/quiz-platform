@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/questions/bank/page.tsx
 'use client'
 
@@ -13,8 +14,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { 
-  Plus, Search, Filter, Edit, Trash2, BookOpen, 
-  Brain, Users, Eye, Copy, MoreVertical, X
+  Plus, Search,  Edit, Trash2, BookOpen, 
+   MoreVertical,
 } from 'lucide-react'
 import {
   Dialog,
@@ -114,6 +115,7 @@ export default function QuestionBankPage() {
     if (session?.user?.id) {
       fetchQuestions()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, searchQuery, categoryFilter, difficultyFilter, typeFilter])
 
   const fetchQuestions = async () => {

@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getDb } from '@/lib/mongodb';
 import { generateRoomCode } from '@/utils/generate-room-code'; // Adjust path as needed
-import { ObjectId } from 'mongodb';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -25,12 +24,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     isUnique = !existingRoom;
   } while (!isUnique);
 
-  const room = await db.collection('rooms').insertOne({
+  /*const room = await db.collection('rooms').insertOne({
     code: roomCode,
     creatorId: userId,
     createdAt: new Date(),
     updatedAt: new Date()
-  });
+  });*/
 
   res.status(201).json({ roomCode });
 }

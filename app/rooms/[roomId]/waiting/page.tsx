@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -35,7 +36,7 @@ interface Room {
 export default function WaitingRoomPage() {
   const params = useParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  useSession()
   const roomId = params?.roomId as string
 
   const [room, setRoom] = useState<Room | null>(null)
@@ -141,7 +142,7 @@ export default function WaitingRoomPage() {
           <CardContent className="p-6 text-center">
             <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-[#e0e0e0] mb-2">Room Not Found</h3>
-            <p className="text-gray-400 mb-4">This room doesn&apos;t exist or you don't have permission to access it.</p>
+            <p className="text-gray-400 mb-4">This room doesn&apos;t exist or you don&apos;t have permission to access it.</p>
             <Button onClick={() => router.push('/dashboard')} className="bg-[#b388ff] hover:bg-[#9c5cff]">
               Return to Dashboard
             </Button>

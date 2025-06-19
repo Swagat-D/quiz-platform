@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { UserPlus, UserMinus, Star } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface Question {

@@ -13,7 +13,7 @@ export async function PUT(request: Request) {
     
     const formData = await request.formData();
     const username = formData.get('username') as string;
-    const avatar = formData.get('avatar') as File;
+    //const avatar = formData.get('avatar') as File;
     
     // In a real implementation, you would upload avatar to a storage service 
     // like AWS S3, Cloudinary, etc. and get a URL back

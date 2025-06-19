@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { 
   Plus, Users, Clock, MoreVertical, Play, Settings, 
   TrendingUp, Award, Target, BookOpen, Search, Eye,
-  Copy, Share2, Trash2, Filter, Calendar
+  Copy, Share2, Trash2, Calendar
 } from 'lucide-react'
 import { useSession } from "next-auth/react"
 import Link from 'next/link'
@@ -205,13 +205,13 @@ export default function Dashboard() {
   }
 }
 
-  const copyToClipboard = async (text: string) => {
+  /*const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
     } catch (err) {
       console.error('Failed to copy:', err)
     }
-  }
+  }*/
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -277,7 +277,7 @@ export default function Dashboard() {
                   Create Room
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-purple-500/30 text-[#e0e0e0] hover:bg-purple-500/10">
+              <Button asChild variant="outline" className="border-purple-500/30 text-[#e0e0e0] bg-purple-400/50 hover:bg-purple-500/40">
                 <Link href="/rooms/join">
                   <Users className="h-4 w-4 mr-2" />
                   Join Room
@@ -584,13 +584,13 @@ export default function Dashboard() {
                     Create Room
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full border-purple-500/30 text-[#e0e0e0] hover:bg-purple-500/10 justify-start">
+                <Button asChild variant="outline" className="w-full border-purple-500/30 bg-purple-400/50 text-[#e0e0e0] hover:bg-purple-500/40 justify-start">
                   <Link href="/rooms/join">
                     <Users className="h-4 w-4 mr-2" />
                     Join Room
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full border-purple-500/30 text-[#e0e0e0] hover:bg-purple-500/10 justify-start">
+                <Button asChild variant="outline" className="w-full border-purple-500/30 bg-purple-500/40 text-[#e0e0e0] hover:bg-purple-400/50 justify-start">
                   <Link href="/questions/bank">
                     <BookOpen className="h-4 w-4 mr-2" />
                     Question Bank
