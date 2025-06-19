@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // app/rooms/[roomId]/quiz/page.tsx
 'use client'
 
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { 
   Clock, CheckCircle2, XCircle, ArrowLeft, ArrowRight, 
-  Flag, Users, Award, Target, AlertCircle
+  Flag, Users, Target, AlertCircle
 } from 'lucide-react'
 
 interface Question {

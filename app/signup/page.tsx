@@ -10,12 +10,10 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { OTPInput } from "@/components/ui/otp-input"
 
 type Step = 'form' | 'verify' | 'welcome'
 

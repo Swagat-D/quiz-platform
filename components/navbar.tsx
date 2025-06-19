@@ -8,14 +8,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { ProfileDropdown } from './profile-dropdown'
 import { SettingsSubpage } from './settings-subpage'
-import { useSession } from "next-auth/react"
 import { LogoutButton } from './logout-button'
 
-interface NavbarProps {
-  showBack?: boolean
-}
-
-export default function Navbar({ showBack }: NavbarProps) {
+export default function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const showBackButton = pathname !== '/' && pathname !== '/dashboard'

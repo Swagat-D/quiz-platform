@@ -1,4 +1,4 @@
-// app/rooms/[roomId]/manage/page.tsx
+/* eslint-disable react-hooks/exhaustive-deps */
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -9,30 +9,29 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import RoomQuestionsManagement from '@/components/RoomQuestionsManagement'
 import { Textarea } from "@/components/ui/textarea"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { 
   Copy, Share2, Play, Settings, Users, BarChart3, 
-  Edit, Trash2, Calendar, Clock, AlertTriangle, CheckCircle2,
-  ClipboardCopy, Send, Plus, X, Eye, Search, BookOpen
+   Calendar, Clock, AlertTriangle, CheckCircle2,
+  ClipboardCopy, Send, X, Eye,  BookOpen,
+  Target, Trophy, TrendingUp, Bell, Globe, Shield, Timer,
+  MoreVertical, Download, RefreshCw, Pause, Square
 } from 'lucide-react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Room {
   id: string
   code: string
   title: string
   description: string
-  status: 'waiting' | 'active' | 'completed' | 'cancelled'
+  status: 'waiting' | 'active' | 'completed' | 'cancelled' | 'paused'
   currentParticipants: number
   maxParticipants: number
   creatorId: string
@@ -48,6 +47,7 @@ interface Room {
   difficulty: string
   timeLimit: number
   scheduledStartTime: string | null
+  scheduledEndTime?: string | null
   createdAt: string
   updatedAt: string
   startedAt: string | null
@@ -79,46 +79,6 @@ interface RoomStatistics {
   completionRate: number
 }
 
-interface Question {
-  id: string
-  title: string
-  content: string
-  options: string[]
-  correctAnswer: number
-  difficulty: 'easy' | 'medium' | 'hard'
-  category: string
-  explanation?: string
-  timeLimit?: number
-  points?: number
-  tags?: string[]
-  creatorName: string
-  isPublic: boolean
-  usage: number
-  createdAt: string
-  canEdit: boolean
-}
-
-interface RoomQuestion {
-  id: string
-  title: string
-  content: string
-  options: string[]
-  correctAnswer: number
-  difficulty: string
-  category: string
-  explanation?: string
-  timeLimit: number
-  points: number
-  order: number
-  isRequired: boolean
-}
-
-const CATEGORIES = [
-  'Programming', 'Web Development', 'Database', 'Algorithms', 
-  'System Design', 'DevOps', 'Mobile Development', 'AI/ML', 
-  'Cybersecurity', 'General Knowledge'
-]
-
 export default function RoomManagePage() {
   const params = useParams()
   const router = useRouter()
@@ -127,86 +87,38 @@ export default function RoomManagePage() {
 
   const [room, setRoom] = useState<Room | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isUpdating, setIsUpdating] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [alertMessage, setAlertMessage] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
 
-  // Questions state
-  const [roomQuestions, setRoomQuestions] = useState<RoomQuestion[]>([])
-  const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
-  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [difficultyFilter, setDifficultyFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [questionsLoading, setQuestionsLoading] = useState(false)
-
-  // New question form
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    options: ['', '', '', ''],
-    correctAnswer: 0,
-    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
-    category: '',
-    explanation: '',
-    timeLimit: 30,
-    points: 1,
-    isPublic: false
-  })
-
-  // Form state for room updates
-  const [roomFormData, setRoomFormData] = useState({
-    title: '',
-    description: '',
-    maxParticipants: 50,
-    timeLimit: 30,
-    isPublic: true,
-    allowLateJoin: true,
-    showLeaderboard: true,
-    shuffleQuestions: false,
-    scheduledStartTime: '',
-    settings: {
-      allowChat: true,
-      allowQuestionSkip: false,
-      showCorrectAnswers: true,
-      instantFeedback: true,
-    }
-  })
-
+  // Real-time updates
   useEffect(() => {
     if (roomId) {
       fetchRoom()
+      const interval = setInterval(fetchRoom, 10000) // Update every 10 seconds
+      return () => clearInterval(interval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
 
+  // Timer for active rooms
   useEffect(() => {
-    if (room) {
-      setRoomFormData({
-        title: room.title,
-        description: room.description,
-        maxParticipants: room.maxParticipants,
-        timeLimit: room.timeLimit,
-        isPublic: room.isPublic,
-        allowLateJoin: room.allowLateJoin,
-        showLeaderboard: room.showLeaderboard,
-        shuffleQuestions: room.shuffleQuestions,
-        scheduledStartTime: room.scheduledStartTime || '',
-        settings: room.settings,
-      })
+    if (room?.status === 'active' && room.scheduledEndTime) {
+      const timer = setInterval(() => {
+        const now = new Date().getTime()
+        const end = new Date(room.scheduledEndTime!).getTime()
+        const remaining = Math.max(0, end - now)
+        setTimeRemaining(remaining)
+        
+        if (remaining === 0) {
+          clearInterval(timer)
+          fetchRoom() // Refresh room status
+        }
+      }, 1000)
+      
+      return () => clearInterval(timer)
     }
-  }, [room])
-
-  useEffect(() => {
-    if (activeTab === 'questions') {
-      fetchRoomQuestions()
-      fetchAvailableQuestions()
-    }
-  }, [activeTab, searchQuery, categoryFilter, difficultyFilter, typeFilter])
+  }, [room?.scheduledEndTime])
 
   const fetchRoom = async () => {
     setIsLoading(true)
@@ -234,262 +146,33 @@ export default function RoomManagePage() {
     }
   }
 
-  const fetchRoomQuestions = async () => {
-    setQuestionsLoading(true)
+  const controlRoom = async (action: 'start' | 'pause' | 'resume' | 'end') => {
     try {
-      const response = await fetch(`/api/rooms/${roomId}/questions`)
-      const data = await response.json()
-      if (data.success) {
-        setRoomQuestions(data.questions || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch room questions:', error)
-    } finally {
-      setQuestionsLoading(false)
-    }
-  }
+      const endpoint = action === 'start' ? `/api/rooms/${roomId}/start` : `/api/rooms/${roomId}/start`
+      const method = action === 'start' ? 'POST' : 'PUT'
+      const body = action !== 'start' ? JSON.stringify({ action }) : undefined
 
-  const fetchAvailableQuestions = async () => {
-    try {
-      const params = new URLSearchParams({
-        type: typeFilter,
-        page: '1',
-        limit: '50',
-        ...(searchQuery && { search: searchQuery }),
-        ...(categoryFilter && { category: categoryFilter }),
-        ...(difficultyFilter && { difficulty: difficultyFilter }),
+      const response = await fetch(endpoint, {
+        method,
+        headers: action !== 'start' ? { 'Content-Type': 'application/json' } : undefined,
+        body,
       })
 
-      const response = await fetch(`/api/questions?${params}`)
-      const data = await response.json()
-
-      if (data.success) {
-        const roomQuestionIds = roomQuestions.map(q => q.id)
-        const filtered = data.questions.filter((q: Question) => !roomQuestionIds.includes(q.id))
-        setAvailableQuestions(filtered)
-      }
-    } catch (error) {
-      console.error('Failed to fetch available questions:', error)
-    }
-  }
-
-  const updateRoom = async () => {
-    if (!room) return
-
-    setIsUpdating(true)
-    try {
-      const response = await fetch(`/api/rooms/${roomId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(roomFormData),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update room')
-      }
-
-      alert('Room updated successfully!')
-      await fetchRoom()
-    } catch (error) {
-      console.error('Update room error:', error)
-      alert(error instanceof Error ? error.message : 'Failed to update room')
-    } finally {
-      setIsUpdating(false)
-    }
-  }
-
-  const deleteRoom = async () => {
-    if (!room) return
-
-    try {
-      const response = await fetch(`/api/rooms/${roomId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
+      if (response.ok) {
+        if (action === 'start') {
+          router.push(`/rooms/${roomId}/live`)
+        } else if (action === 'end') {
+          router.push(`/rooms/${roomId}/results`)
+        } else {
+          fetchRoom()
         }
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete room')
-      }
-
-      alert('Room deleted successfully!')
-      router.push('/dashboard')
-    } catch (error) {
-      console.error('Delete room error:', error)
-      alert(error instanceof Error ? error.message : 'Failed to delete room')
-    }
-  }
-
-  const startRoom = async () => {
-    if (!room) return
-
-    // Check if room has questions
-    if (roomQuestions.length === 0) {
-      alert('Cannot start room without questions. Please add questions first.')
-      setActiveTab('questions')
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/rooms/${roomId}/start`, {
-        method: 'POST',
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to start room')
-      }
-
-      alert('Room started successfully!')
-      router.push(`/rooms/${roomId}/live`)
-    } catch (error) {
-      console.error('Start room error:', error)
-      alert(error instanceof Error ? error.message : 'Failed to start room')
-    }
-  }
-
-  const handleAddQuestions = async () => {
-    if (selectedQuestions.length === 0 || room?.status !== 'waiting') return
-
-    setIsSubmitting(true)
-    try {
-      const response = await fetch(`/api/rooms/${roomId}/questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionIds: selectedQuestions,
-          replaceAll: false
-        }),
-      })
-
-      if (response.ok) {
-        setSelectedQuestions([])
-        await Promise.all([
-          fetchRoomQuestions(),
-          fetchAvailableQuestions(),
-          fetchRoom()
-        ])
-        alert('Questions added successfully!')
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to add questions')
+        alert(error.error || `Failed to ${action} room`)
       }
     } catch (error) {
-      console.error('Add questions error:', error)
-      alert('Failed to add questions')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleRemoveQuestion = async (questionId: string) => {
-    if (room?.status !== 'waiting' || !confirm('Remove this question from the room?')) return
-
-    try {
-      const response = await fetch(`/api/rooms/${roomId}/questions?questionIds=${questionId}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        await Promise.all([
-          fetchRoomQuestions(),
-          fetchAvailableQuestions(),
-          fetchRoom()
-        ])
-        alert('Question removed successfully!')
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to remove question')
-      }
-    } catch (error) {
-      console.error('Remove question error:', error)
-      alert('Failed to remove question')
-    }
-  }
-
-  const handleCreateQuestion = async () => {
-    if (!formData.title || !formData.content || formData.options.some(opt => !opt.trim())) {
-      alert('Please fill in all required fields')
-      return
-    }
-
-    setIsSubmitting(true)
-    try {
-      const response = await fetch('/api/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setIsCreateDialogOpen(false)
-        resetQuestionForm()
-        
-        // Add the new question to room
-        await fetch(`/api/rooms/${roomId}/questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            questionIds: [result.question.id],
-            replaceAll: false
-          }),
-        })
-
-        await Promise.all([
-          fetchRoomQuestions(),
-          fetchAvailableQuestions(),
-          fetchRoom()
-        ])
-        alert('Question created and added to room!')
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to create question')
-      }
-    } catch (error) {
-      console.error('Create question error:', error)
-      alert('Failed to create question')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const resetQuestionForm = () => {
-    setFormData({
-      title: '',
-      content: '',
-      options: ['', '', '', ''],
-      correctAnswer: 0,
-      difficulty: 'medium',
-      category: '',
-      explanation: '',
-      timeLimit: 30,
-      points: 1,
-      isPublic: false
-    })
-  }
-
-  const sendAlert = async () => {
-    if (!alertMessage.trim()) {
-      alert('Please enter an alert message')
-      return
-    }
-
-    try {
-      // For now, just simulate sending alert since we don't have the API endpoint
-      alert('Alert functionality will be implemented with real-time features!')
-      setAlertMessage('')
-    } catch (error) {
-      console.error('Send alert error:', error)
-      alert('Failed to send alert')
+      console.error(`${action} room error:`, error)
+      alert(`Failed to ${action} room`)
     }
   }
 
@@ -499,29 +182,50 @@ export default function RoomManagePage() {
       alert('Copied to clipboard!')
     } catch (err) {
       console.error('Failed to copy:', err)
-      alert('Failed to copy to clipboard')
     }
   }
 
-  const shareLink = typeof window !== 'undefined' ? `${window.location.origin}/rooms/join?code=${room?.code}` : ''
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-500/20 text-green-400 border-green-500/30'
-      case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-      case 'hard': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     }
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
   }
 
-  const updateQuestionFormField = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const updateQuestionOption = (index: number, value: string) => {
-    const newOptions = [...formData.options]
-    newOptions[index] = value
-    setFormData(prev => ({ ...prev, options: newOptions }))
+  const getStatusConfig = (status: string) => {
+    const configs = {
+      waiting: { 
+        color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        icon: Clock,
+        label: 'Waiting to Start'
+      },
+      active: { 
+        color: 'bg-green-500/20 text-green-400 border-green-500/30',
+        icon: Play,
+        label: 'Active'
+      },
+      paused: { 
+        color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+        icon: Pause,
+        label: 'Paused'
+      },
+      completed: { 
+        color: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+        icon: Trophy,
+        label: 'Completed'
+      },
+      cancelled: { 
+        color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+        icon: X,
+        label: 'Cancelled'
+      }
+    }
+    return configs[status as keyof typeof configs] || configs.waiting
   }
 
   if (isLoading) {
@@ -552,280 +256,472 @@ export default function RoomManagePage() {
     )
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'waiting': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30'
-      case 'completed': return 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-      case 'cancelled': return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-    }
-  }
+  const statusConfig = getStatusConfig(room.status)
+  const shareLink = typeof window !== 'undefined' ? `${window.location.origin}/rooms/join?code=${room.code}` : ''
 
   return (
     <div className="min-h-screen bg-[#1a1f2e]">
       <Navbar />
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-[#b388ff]">{room.title}</h1>
-                <Badge className={getStatusColor(room.status)}>
-                  {room.status}
-                </Badge>
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[#242b3d] to-[#2a3042] border-b border-purple-500/20">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-[#b388ff]/10 rounded-xl">
+                <statusConfig.icon className="h-8 w-8 text-[#b388ff]" />
               </div>
-              <p className="text-[#e0e0e0]">Manage your quiz room settings and monitor participants</p>
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-white">{room.title}</h1>
+                  <Badge className={statusConfig.color}>
+                    {statusConfig.label}
+                  </Badge>
+                </div>
+                <p className="text-gray-300 text-lg">{room.description}</p>
+                <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+                  <span>Room {room.code}</span>
+                  <span>•</span>
+                  <span>{room.category}</span>
+                  <span>•</span>
+                  <span>Created {new Date(room.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
             </div>
             
             <div className="flex flex-wrap gap-3">
+              {/* Status-specific actions */}
               {room.status === 'waiting' && (
-                <Button onClick={startRoom} className="bg-green-600 hover:bg-green-700 text-white">
+                <Button 
+                  onClick={() => controlRoom('start')} 
+                  className="bg-green-600 hover:bg-green-700 text-white px-6"
+                >
                   <Play className="h-4 w-4 mr-2" />
                   Start Room
                 </Button>
               )}
               
               {room.status === 'active' && (
-                <Button onClick={() => router.push(`/rooms/${roomId}/live`)} className="bg-green-600 hover:bg-green-700 text-white">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Live
+                <>
+                  <Button 
+                    onClick={() => router.push(`/rooms/${roomId}/live`)} 
+                    className="bg-green-600 hover:bg-green-700 text-white px-6"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Live
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="border-purple-500/30 text-[#e0e0e0]">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-[#242b3d] border-purple-500/20">
+                      <DropdownMenuItem onClick={() => controlRoom('pause')} className="text-yellow-400">
+                        <Pause className="h-4 w-4 mr-2" />
+                        Pause Room
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => controlRoom('end')} className="text-red-400">
+                        <Square className="h-4 w-4 mr-2" />
+                        End Room
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+
+              {room.status === 'paused' && (
+                <>
+                  <Button 
+                    onClick={() => controlRoom('resume')} 
+                    className="bg-green-600 hover:bg-green-700 text-white px-6"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Resume Room
+                  </Button>
+                  <Button 
+                    onClick={() => controlRoom('end')} 
+                    variant="outline" 
+                    className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                  >
+                    <Square className="h-4 w-4 mr-2" />
+                    End Room
+                  </Button>
+                </>
+              )}
+
+              {room.status === 'completed' && (
+                <Button 
+                  onClick={() => router.push(`/rooms/${roomId}/results`)} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6"
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Results
                 </Button>
               )}
 
-              <Button onClick={() => copyToClipboard(shareLink)} variant="outline" className="border-purple-500/30 text-[#e0e0e0]">
+              {/* Share button */}
+              <Button 
+                onClick={() => copyToClipboard(shareLink)} 
+                variant="outline" 
+                className="border-purple-500/30 text-[#e0e0e0] hover:bg-purple-500/10"
+              >
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
             </div>
           </div>
 
-          {/* Room Info Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <Card className="bg-[#242b3d] border-purple-500/20">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">Room Code</p>
-                  <div className="flex items-center justify-center gap-2 mt-1">
-                    <p className="text-xl font-bold text-[#b388ff] font-mono">{room.code}</p>
-                    <Button
-                      onClick={() => copyToClipboard(room.code)}
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-6 p-0"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#242b3d] border-purple-500/20">
-              <CardContent className="p-4">
-                <div className="text-center">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+            <div className="bg-[#1a1f2e]/50 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-[#b388ff]" />
+                <div>
                   <p className="text-sm text-gray-400">Participants</p>
-                  <p className="text-xl font-bold text-[#e0e0e0]">{room.currentParticipants}/{room.maxParticipants}</p>
+                  <p className="text-xl font-bold text-white">{room.currentParticipants}/{room.maxParticipants}</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#242b3d] border-purple-500/20">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">Time Limit</p>
-                  <p className="text-xl font-bold text-[#e0e0e0]">{room.timeLimit}m</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#242b3d] border-purple-500/20">
-              <CardContent className="p-4">
-                <div className="text-center">
+              </div>
+            </div>
+            
+            <div className="bg-[#1a1f2e]/50 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <BookOpen className="h-5 w-5 text-[#b388ff]" />
+                <div>
                   <p className="text-sm text-gray-400">Questions</p>
-                  <p className="text-xl font-bold text-[#e0e0e0]">{roomQuestions.length}</p>
+                  <p className="text-xl font-bold text-white">{room.statistics.totalQuestions}</p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+            
+            <div className="bg-[#1a1f2e]/50 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <Timer className="h-5 w-5 text-[#b388ff]" />
+                <div>
+                  <p className="text-sm text-gray-400">Duration</p>
+                  <p className="text-xl font-bold text-white">{room.timeLimit}m</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-[#1a1f2e]/50 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                {timeRemaining !== null ? (
+                  <Clock className="h-5 w-5 text-amber-400" />
+                ) : (
+                  <Trophy className="h-5 w-5 text-[#b388ff]" />
+                )}
+                <div>
+                  <p className="text-sm text-gray-400">
+                    {timeRemaining !== null ? 'Time Left' : 'Score'}
+                  </p>
+                  <p className="text-xl font-bold text-white">
+                    {timeRemaining !== null ? formatTime(timeRemaining) : `${room.statistics.averageScore}%`}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-[#242b3d]">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-[#b388ff]">Overview</TabsTrigger>
-            <TabsTrigger value="participants" className="data-[state=active]:bg-[#b388ff]">Participants</TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-[#b388ff]">Settings</TabsTrigger>
-            <TabsTrigger value="questions" className="data-[state=active]:bg-[#b388ff]">Questions</TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-[#b388ff]">Analytics</TabsTrigger>
+      <main className="container mx-auto px-4 py-8 max-w-7xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+          <TabsList className="grid w-full max-w-2xl grid-cols-5 bg-[#242b3d] h-12">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-[#b388ff] data-[state=active]:text-white">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="participants" className="data-[state=active]:bg-[#b388ff] data-[state=active]:text-white">
+              Participants
+            </TabsTrigger>
+            <TabsTrigger value="questions" className="data-[state=active]:bg-[#b388ff] data-[state=active]:text-white">
+              Questions
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-[#b388ff] data-[state=active]:text-white">
+              Settings
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-[#b388ff] data-[state=active]:text-white">
+              Analytics
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TabsContent value="overview" className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Room Details */}
-              <Card className="bg-[#242b3d] border-purple-500/20">
-                <CardHeader>
-                  <CardTitle className="text-xl text-[#b388ff]">Room Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-gray-400">Title</Label>
-                      <p className="text-[#e0e0e0] font-medium">{room.title}</p>
-                    </div>
-                    
-                    {room.description && (
-                      <div>
-                        <Label className="text-gray-400">Description</Label>
-                        <p className="text-[#e0e0e0]">{room.description}</p>
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="bg-[#242b3d] border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-[#b388ff] flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      Room Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-gray-400 text-sm">Room Code</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <code className="bg-[#1a1f2e] px-4 py-2 rounded-lg text-[#b388ff] font-mono text-lg font-bold flex-1">
+                              {room.code}
+                            </code>
+                            <Button
+                              onClick={() => copyToClipboard(room.code)}
+                              size="sm"
+                              variant="outline"
+                              className="border-purple-500/30"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-400 text-sm">Category</Label>
+                          <p className="text-[#e0e0e0] font-medium mt-1">{room.category}</p>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-400 text-sm">Difficulty</Label>
+                          <Badge className={`mt-1 ${
+                            room.difficulty === 'easy' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                            room.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                            'bg-red-500/20 text-red-400 border-red-500/30'
+                          }`}>
+                            {room.difficulty}
+                          </Badge>
+                        </div>
                       </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-gray-400">Category</Label>
-                        <p className="text-[#e0e0e0]">{room.category}</p>
-                      </div>
-                      <div>
-                        <Label className="text-gray-400">Difficulty</Label>
-                        <p className="text-[#e0e0e0] capitalize">{room.difficulty}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-gray-400">Visibility</Label>
-                        <p className="text-[#e0e0e0]">{room.isPublic ? 'Public' : 'Private'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-gray-400">Late Join</Label>
-                        <p className="text-[#e0e0e0]">{room.allowLateJoin ? 'Allowed' : 'Not Allowed'}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-gray-400">Created</Label>
-                      <p className="text-[#e0e0e0]">{new Date(room.createdAt).toLocaleString()}</p>
-                    </div>
-
-                    {room.scheduledStartTime && (
-                      <div>
-                        <Label className="text-gray-400">Scheduled Start</Label>
-                        <p className="text-[#e0e0e0]">{new Date(room.scheduledStartTime).toLocaleString()}</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Quick Actions */}
-              <Card className="bg-[#242b3d] border-purple-500/20">
-                <CardHeader>
-                  <CardTitle className="text-xl text-[#b388ff]">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Share Room */}
-                  <div className="space-y-2">
-                    <Label className="text-[#e0e0e0]">Share Room</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={shareLink}
-                        readOnly
-                        className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] text-sm"
-                      />
-                      <Button
-                        onClick={() => copyToClipboard(shareLink)}
-                        size="sm"
-                        className="bg-[#b388ff] hover:bg-[#9c5cff]"
-                      >
-                        <ClipboardCopy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Send Alert */}
-                  <div className="space-y-2">
-                    <Label className="text-[#e0e0e0]">Send Alert to Participants</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter alert message..."
-                        value={alertMessage}
-                        onChange={(e) => setAlertMessage(e.target.value)}
-                        className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                      />
-                      <Button
-                        onClick={sendAlert}
-                        size="sm"
-                        disabled={!alertMessage.trim()}
-                        className="bg-amber-600 hover:bg-amber-700"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Room Actions */}
-                  <div className="space-y-2 pt-4 border-t border-gray-600">
-                    {room.status === 'waiting' && (
-                      <>
-                        <Button
-                          onClick={() => setActiveTab('questions')}
-                          className="w-full bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Manage Questions ({roomQuestions.length})
-                        </Button>
-                        <Button
-                          onClick={startRoom}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                          disabled={roomQuestions.length === 0}
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Room Now
-                        </Button>
-                        {roomQuestions.length === 0 && (
-                          <p className="text-xs text-amber-400 text-center">
-                            Add questions before starting the room
-                          </p>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-gray-400 text-sm">Visibility</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            {room.isPublic ? (
+                              <>
+                                <Globe className="h-4 w-4 text-green-400" />
+                                <span className="text-green-400">Public</span>
+                              </>
+                            ) : (
+                              <>
+                                <Shield className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-400">Private</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-400 text-sm">Created</Label>
+                          <p className="text-[#e0e0e0] mt-1">{new Date(room.createdAt).toLocaleString()}</p>
+                        </div>
+                        
+                        {room.scheduledStartTime && (
+                          <div>
+                            <Label className="text-gray-400 text-sm">Scheduled Start</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Calendar className="h-4 w-4 text-blue-400" />
+                              <span className="text-[#e0e0e0]">{new Date(room.scheduledStartTime).toLocaleString()}</span>
+                            </div>
+                          </div>
                         )}
-                      </>
-                    )}
+                      </div>
+                    </div>
 
-                    {room.status === 'active' && (
-                      <Button
-                        onClick={() => router.push(`/rooms/${roomId}/live`)}
-                        className="w-full bg-green-600 hover:bg-green-700"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Live Room
-                      </Button>
-                    )}
+                    {/* Room Features */}
+                    <div className="border-t border-gray-600 pt-6">
+                      <h4 className="text-sm font-medium text-[#e0e0e0] mb-4">Room Features</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className={`h-4 w-4 ${room.allowLateJoin ? 'text-green-400' : 'text-gray-400'}`} />
+                          <span className={room.allowLateJoin ? 'text-green-400' : 'text-gray-400'}>
+                            Late Join {room.allowLateJoin ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className={`h-4 w-4 ${room.showLeaderboard ? 'text-green-400' : 'text-gray-400'}`} />
+                          <span className={room.showLeaderboard ? 'text-green-400' : 'text-gray-400'}>
+                            Leaderboard {room.showLeaderboard ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className={`h-4 w-4 ${room.settings.instantFeedback ? 'text-green-400' : 'text-gray-400'}`} />
+                          <span className={room.settings.instantFeedback ? 'text-green-400' : 'text-gray-400'}>
+                            Instant Feedback {room.settings.instantFeedback ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className={`h-4 w-4 ${room.shuffleQuestions ? 'text-green-400' : 'text-gray-400'}`} />
+                          <span className={room.shuffleQuestions ? 'text-green-400' : 'text-gray-400'}>
+                            Shuffle Questions {room.shuffleQuestions ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
+                {/* Live Activity Feed */}
+                <Card className="bg-[#242b3d] border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-[#b388ff] flex items-center gap-2">
+                      <Bell className="h-5 w-5" />
+                      Live Activity
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30 ml-auto">
+                        Live
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {/* Mock activity items */}
+                      <div className="flex items-center gap-3 p-3 bg-[#1a1f2e] rounded-lg">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span className="text-[#e0e0e0] text-sm">John Doe joined the room</span>
+                        <span className="text-gray-400 text-xs ml-auto">2 min ago</span>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-[#1a1f2e] rounded-lg">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <span className="text-[#e0e0e0] text-sm">Room settings updated</span>
+                        <span className="text-gray-400 text-xs ml-auto">5 min ago</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Quick Actions */}
+                <Card className="bg-[#242b3d] border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#b388ff]">Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button 
+                      onClick={() => copyToClipboard(shareLink)} 
+                      variant="outline" 
+                      className="w-full border-purple-500/30 text-[#e0e0e0] justify-start"
+                    >
+                      <ClipboardCopy className="h-4 w-4 mr-2" />
+                      Copy Share Link
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => setActiveTab('participants')} 
+                      variant="outline" 
+                      className="w-full border-purple-500/30 text-[#e0e0e0] justify-start"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Manage Participants
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => setActiveTab('questions')} 
+                      variant="outline" 
+                      className="w-full border-purple-500/30 text-[#e0e0e0] justify-start"
+                    >
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Manage Questions
+                    </Button>
+                    
                     {room.status === 'completed' && (
-                      <Button
-                        onClick={() => router.push(`/rooms/${roomId}/results`)}
-                        className="w-full bg-purple-600 hover:bg-purple-700"
+                      <Button 
+                        onClick={() => router.push(`/rooms/${roomId}/results`)} 
+                        variant="outline" 
+                        className="w-full border-purple-500/30 text-[#e0e0e0] justify-start"
                       >
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        View Results
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Results
                       </Button>
                     )}
+                  </CardContent>
+                </Card>
 
-                    {(room.status === 'waiting' || room.status === 'completed') && (
-                      <Button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        variant="outline"
-                        className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Room
-                      </Button>
+                {/* Participant Status */}
+                <Card className="bg-[#242b3d] border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#b388ff] flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Participants ({room.currentParticipants})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {room.participants.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No participants yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-48 overflow-y-auto">
+                        {room.participants.slice(0, 5).map((participant, index) => (
+                          <div key={index} className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-[#b388ff] rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                              {participant.userName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[#e0e0e0] text-sm font-medium truncate">{participant.userName}</p>
+                              <div className="flex items-center gap-1">
+                                <div className={`w-2 h-2 rounded-full ${participant.isActive ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                                <span className="text-xs text-gray-400">
+                                  {participant.isActive ? 'Online' : 'Offline'}
+                                </span>
+                              </div>
+                            </div>
+                            {room.status === 'completed' && (
+                              <div className="text-right">
+                                <p className="text-[#e0e0e0] text-sm font-semibold">{participant.score}%</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {room.participants.length > 5 && (
+                          <div className="text-center pt-2">
+                            <Button 
+                              onClick={() => setActiveTab('participants')} 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-[#b388ff] hover:bg-purple-500/10"
+                            >
+                              View all {room.participants.length} participants
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+
+                {/* Send Alert */}
+                <Card className="bg-[#242b3d] border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#b388ff]">Send Alert</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Textarea
+                      placeholder="Type your message to participants..."
+                      value={alertMessage}
+                      onChange={(e) => setAlertMessage(e.target.value)}
+                      className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] resize-none"
+                      rows={3}
+                    />
+                    <Button 
+                      onClick={() => {
+                        if (alertMessage.trim()) {
+                          alert('Alert sent to all participants!')
+                          setAlertMessage('')
+                        }
+                      }}
+                      disabled={!alertMessage.trim()}
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Alert
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
@@ -833,72 +729,101 @@ export default function RoomManagePage() {
           <TabsContent value="participants" className="space-y-6">
             <Card className="bg-[#242b3d] border-purple-500/20">
               <CardHeader>
-                <CardTitle className="text-xl text-[#b388ff] flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Participants ({room.currentParticipants}/{room.maxParticipants})
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl text-[#b388ff] flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Participants ({room.currentParticipants}/{room.maxParticipants})
+                  </CardTitle>
+                  <Button 
+                    onClick={fetchRoom} 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-purple-500/30 text-[#e0e0e0]"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {room.participants.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
+                  <div className="text-center py-12 text-gray-400">
                     <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
                     <h3 className="text-lg font-medium mb-2">No participants yet</h3>
                     <p>Share the room code to get people to join</p>
+                    <div className="mt-4">
+                      <Button 
+                        onClick={() => copyToClipboard(shareLink)} 
+                        className="bg-[#b388ff] hover:bg-[#9c5cff]"
+                      >
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share Room
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {room.participants.map((participant, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-[#1a1f2e] rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-[#b388ff] rounded-full flex items-center justify-center text-white font-semibold">
-                            {participant.userName.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-[#e0e0e0]">{participant.userName}</p>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              {participant.isAuthenticated ? (
-                                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
-                                  Authenticated
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs">
-                                  Guest
-                                </Badge>
-                              )}
-                              <span>•</span>
-                              <span>Joined {new Date(participant.joinedAt).toLocaleString()}</span>
+                    {/* Participant list */}
+                    <div className="grid gap-4">
+                      {room.participants.map((participant, index) => (
+                        <div key={index} className="flex items-center justify-between p-4 bg-[#1a1f2e] rounded-lg border border-gray-700 hover:border-purple-500/30 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="relative">
+                              <div className="w-12 h-12 bg-gradient-to-br from-[#b388ff] to-[#9c5cff] rounded-full flex items-center justify-center text-white font-bold text-lg">
+                                {participant.userName.charAt(0).toUpperCase()}
+                              </div>
+                              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#1a1f2e] ${participant.isActive ? 'bg-green-400' : 'bg-gray-400'}`}></div>
                             </div>
-                          </div>
-                        </div>
-                        
-                        <div className="text-right">
-                          {room.status === 'completed' && (
                             <div>
-                              <p className="text-lg font-semibold text-[#e0e0e0]">{participant.score}%</p>
-                              <p className="text-sm text-gray-400">{participant.answeredQuestions} questions</p>
+                              <h4 className="font-semibold text-[#e0e0e0] text-lg">{participant.userName}</h4>
+                              <div className="flex items-center gap-4 text-sm text-gray-400">
+                                <span>{participant.isAuthenticated ? 'Authenticated User' : 'Guest User'}</span>
+                                <span>•</span>
+                                <span>Joined {new Date(participant.joinedAt).toLocaleString()}</span>
+                              </div>
+                              {participant.email && (
+                                <p className="text-sm text-gray-400 mt-1">{participant.email}</p>
+                              )}
                             </div>
-                          )}
+                          </div>
                           
-                          <div className="flex items-center gap-1 text-xs">
-                            {participant.isActive ? (
-                              <div className="flex items-center gap-1 text-green-400">
-                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                <span>Online</span>
+                          <div className="text-right">
+                            {room.status === 'completed' ? (
+                              <div>
+                                <p className="text-2xl font-bold text-[#e0e0e0]">{participant.score}%</p>
+                                <p className="text-sm text-gray-400">{participant.answeredQuestions} questions</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Last active: {new Date(participant.lastActivity).toLocaleString()}
+                                </p>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 text-gray-400">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                <span>Offline</span>
+                              <div>
+                                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${participant.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                  <div className={`w-2 h-2 rounded-full ${participant.isActive ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                                  {participant.isActive ? 'Online' : 'Offline'}
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2">
+                                  Last seen: {new Date(participant.lastActivity).toLocaleString()}
+                                </p>
                               </div>
                             )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Questions Tab */}
+          <TabsContent value="questions" className="space-y-6">
+            <RoomQuestionsManagement 
+              roomId={roomId}
+              roomStatus={room.status}
+              onQuestionsUpdate={fetchRoom}
+            />
           </TabsContent>
 
           {/* Settings Tab */}
@@ -918,586 +843,16 @@ export default function RoomManagePage() {
             ) : (
               <Card className="bg-[#242b3d] border-purple-500/20">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl text-[#b388ff]">Room Settings</CardTitle>
-                    <Button
-                      onClick={updateRoom}
-                      disabled={isUpdating}
-                      className="bg-[#b388ff] hover:bg-[#9c5cff]"
-                    >
-                      {isUpdating ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                  </div>
+                  <CardTitle className="text-xl text-[#b388ff]">Room Settings</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Basic Settings */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-[#e0e0e0]">Basic Information</h3>
-                    
-                    <div>
-                      <Label htmlFor="title" className="text-[#e0e0e0]">Room Title</Label>
-                      <Input
-                        id="title"
-                        value={roomFormData.title}
-                        onChange={(e) => setRoomFormData(prev => ({ ...prev, title: e.target.value }))}
-                        className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="description" className="text-[#e0e0e0]">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={roomFormData.description}
-                        onChange={(e) => setRoomFormData(prev => ({ ...prev, description: e.target.value }))}
-                        className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="maxParticipants" className="text-[#e0e0e0]">Max Participants</Label>
-                        <Input
-                          id="maxParticipants"
-                          type="number"
-                          min="2"
-                          max="1000"
-                          value={roomFormData.maxParticipants}
-                          onChange={(e) => setRoomFormData(prev => ({ ...prev, maxParticipants: parseInt(e.target.value) || 2 }))}
-                          className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="timeLimit" className="text-[#e0e0e0]">Time Limit (minutes)</Label>
-                        <Input
-                          id="timeLimit"
-                          type="number"
-                          min="5"
-                          max="180"
-                          value={roomFormData.timeLimit}
-                          onChange={(e) => setRoomFormData(prev => ({ ...prev, timeLimit: parseInt(e.target.value) || 5 }))}
-                          className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0] mt-1"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Privacy Settings */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-[#e0e0e0]">Privacy & Access</h3>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Public Room</Label>
-                          <p className="text-sm text-gray-400">Allow anyone to discover and join this room</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.isPublic}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, isPublic: checked }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Allow Late Join</Label>
-                          <p className="text-sm text-gray-400">Participants can join after the quiz has started</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.allowLateJoin}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, allowLateJoin: checked }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Show Leaderboard</Label>
-                          <p className="text-sm text-gray-400">Display live rankings to participants</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.showLeaderboard}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, showLeaderboard: checked }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Shuffle Questions</Label>
-                          <p className="text-sm text-gray-400">Randomize question order for each participant</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.shuffleQuestions}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({ ...prev, shuffleQuestions: checked }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quiz Behavior */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-[#e0e0e0]">Quiz Behavior</h3>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Allow Chat</Label>
-                          <p className="text-sm text-gray-400">Enable participant chat during quiz</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.settings.allowChat}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({
-                            ...prev,
-                            settings: { ...prev.settings, allowChat: checked }
-                          }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Show Correct Answers</Label>
-                          <p className="text-sm text-gray-400">Display correct answers after each question</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.settings.showCorrectAnswers}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({
-                            ...prev,
-                            settings: { ...prev.settings, showCorrectAnswers: checked }
-                          }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Instant Feedback</Label>
-                          <p className="text-sm text-gray-400">Show if answer is correct immediately</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.settings.instantFeedback}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({
-                            ...prev,
-                            settings: { ...prev.settings, instantFeedback: checked }
-                          }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-[#e0e0e0]">Allow Question Skip</Label>
-                          <p className="text-sm text-gray-400">Participants can skip difficult questions</p>
-                        </div>
-                        <Switch
-                          checked={roomFormData.settings.allowQuestionSkip}
-                          onCheckedChange={(checked) => setRoomFormData(prev => ({
-                            ...prev,
-                            settings: { ...prev.settings, allowQuestionSkip: checked }
-                          }))}
-                        />
-                      </div>
-                    </div>
+                  <div className="text-center py-8 text-gray-400">
+                    <Settings className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Settings management panel will be implemented here</p>
                   </div>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          {/* Questions Tab */}
-          <TabsContent value="questions" className="space-y-6">
-            <div className="space-y-6">
-              <Tabs defaultValue="room-questions" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-2 bg-[#242b3d]">
-                  <TabsTrigger value="room-questions" className="data-[state=active]:bg-[#b388ff]">
-                    Room Questions ({roomQuestions.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="add-questions" className="data-[state=active]:bg-[#b388ff]">
-                    Add Questions
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Room Questions Tab */}
-                <TabsContent value="room-questions" className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-[#e0e0e0]">Current Questions</h3>
-                    {room.status === 'waiting' && (
-                      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button 
-                            className="bg-[#b388ff] hover:bg-[#9c5cff] text-white"
-                            onClick={resetQuestionForm}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create New Question
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-[#242b3d] border-purple-500/20 max-w-2xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle className="text-[#b388ff]">Create New Question</DialogTitle>
-                          </DialogHeader>
-                          
-                          <div className="space-y-4">
-                            <div>
-                              <Label className="text-[#e0e0e0]">Question Title *</Label>
-                              <Input
-                                value={formData.title}
-                                onChange={(e) => updateQuestionFormField('title', e.target.value)}
-                                placeholder="Enter question title"
-                                className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                              />
-                            </div>
-
-                            <div>
-                              <Label className="text-[#e0e0e0]">Question Content *</Label>
-                              <Textarea
-                                value={formData.content}
-                                onChange={(e) => updateQuestionFormField('content', e.target.value)}
-                                placeholder="Enter the question content"
-                                className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                                rows={3}
-                              />
-                            </div>
-
-                            <div>
-                              <Label className="text-[#e0e0e0]">Answer Options *</Label>
-                              <RadioGroup 
-                                value={formData.correctAnswer.toString()} 
-                                onValueChange={(value) => updateQuestionFormField('correctAnswer', parseInt(value))}
-                                className="space-y-2"
-                              >
-                                {formData.options.map((option, index) => (
-                                  <div key={index} className="flex items-center space-x-2">
-                                    <RadioGroupItem 
-                                      value={index.toString()} 
-                                      id={`option-${index}`}
-                                      className="text-[#b388ff]"
-                                    />
-                                    <Input
-                                      value={option}
-                                      onChange={(e) => updateQuestionOption(index, e.target.value)}
-                                      placeholder={`Option ${index + 1}`}
-                                      className="flex-1 bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                                    />
-                                    <Label htmlFor={`option-${index}`} className="text-xs text-gray-400">
-                                      Correct
-                                    </Label>
-                                  </div>
-                                ))}
-                              </RadioGroup>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-[#e0e0e0]">Category *</Label>
-                                <select
-                                  value={formData.category}
-                                  onChange={(e) => updateQuestionFormField('category', e.target.value)}
-                                  className="w-full px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0]"
-                                >
-                                  <option value="">Select category</option>
-                                  {CATEGORIES.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div>
-                                <Label className="text-[#e0e0e0]">Difficulty</Label>
-                                <select
-                                  value={formData.difficulty}
-                                  onChange={(e) => updateQuestionFormField('difficulty', e.target.value)}
-                                  className="w-full px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0]"
-                                >
-                                  <option value="easy">Easy</option>
-                                  <option value="medium">Medium</option>
-                                  <option value="hard">Hard</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-[#e0e0e0]">Time Limit (seconds)</Label>
-                                <Input
-                                  type="number"
-                                  value={formData.timeLimit}
-                                  onChange={(e) => updateQuestionFormField('timeLimit', parseInt(e.target.value) || 30)}
-                                  className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                                />
-                              </div>
-
-                              <div>
-                                <Label className="text-[#e0e0e0]">Points</Label>
-                                <Input
-                                  type="number"
-                                  value={formData.points}
-                                  onChange={(e) => updateQuestionFormField('points', parseInt(e.target.value) || 1)}
-                                  className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <Label className="text-[#e0e0e0]">Explanation (Optional)</Label>
-                              <Textarea
-                                value={formData.explanation}
-                                onChange={(e) => updateQuestionFormField('explanation', e.target.value)}
-                                placeholder="Explain why this is the correct answer"
-                                className="bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                                rows={2}
-                              />
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                id="isPublic"
-                                checked={formData.isPublic}
-                                onChange={(e) => updateQuestionFormField('isPublic', e.target.checked)}
-                                className="rounded border-purple-500/20"
-                              />
-                              <Label htmlFor="isPublic" className="text-[#e0e0e0]">
-                                Make this question public
-                              </Label>
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                              <Button
-                                onClick={handleCreateQuestion}
-                                disabled={isSubmitting}
-                                className="flex-1 bg-[#b388ff] hover:bg-[#9c5cff] text-white"
-                              >
-                                {isSubmitting ? 'Creating...' : 'Create & Add to Room'}
-                              </Button>
-                              <Button
-                                onClick={() => setIsCreateDialogOpen(false)}
-                                variant="outline"
-                                className="border-purple-500/30 text-[#e0e0e0] hover:bg-purple-500/10"
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-
-                  {questionsLoading ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b388ff] mx-auto mb-4"></div>
-                      <p className="text-gray-400">Loading questions...</p>
-                    </div>
-                  ) : roomQuestions.length === 0 ? (
-                    <Card className="bg-[#242b3d] border-purple-500/20">
-                      <CardContent className="py-8 text-center">
-                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400 opacity-50" />
-                        <h3 className="text-lg font-medium text-[#e0e0e0] mb-2">No questions added yet</h3>
-                        <p className="text-gray-400 mb-4">Add questions from your question bank or create new ones</p>
-                        {room.status === 'waiting' && (
-                          <div className="flex gap-3 justify-center">
-                            <Button
-                              onClick={() => setIsCreateDialogOpen(true)}
-                              className="bg-[#b388ff] hover:bg-[#9c5cff]"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Create Question
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="space-y-3">
-                      {roomQuestions.map((question, index) => (
-                        <Card key={question.id} className="bg-[#242b3d] border-purple-500/20">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <span className="bg-[#b388ff] text-white px-2 py-1 rounded text-sm font-medium">
-                                    {index + 1}
-                                  </span>
-                                  <h4 className="font-medium text-[#e0e0e0]">{question.title}</h4>
-                                </div>
-                                <p className="text-gray-400 text-sm mb-3">{question.content}</p>
-                                <div className="flex items-center gap-4">
-                                  <Badge className={getDifficultyColor(question.difficulty)}>
-                                    {question.difficulty}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-[#e0e0e0] border-gray-500/30">
-                                    {question.category}
-                                  </Badge>
-                                  <div className="flex items-center gap-1 text-xs text-gray-400">
-                                    <Clock className="h-3 w-3" />
-                                    {question.timeLimit}s
-                                  </div>
-                                  <div className="flex items-center gap-1 text-xs text-gray-400">
-                                    <BookOpen className="h-3 w-3" />
-                                    {question.points}pts
-                                  </div>
-                                </div>
-                              </div>
-                              {room.status === 'waiting' && (
-                                <Button
-                                  onClick={() => handleRemoveQuestion(question.id)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Add Questions Tab */}
-                <TabsContent value="add-questions" className="space-y-4">
-                  {room.status !== 'waiting' ? (
-                    <Card className="bg-[#242b3d] border-amber-500/20">
-                      <CardContent className="p-6">
-                        <div className="flex items-center gap-3 text-amber-400">
-                          <AlertTriangle className="h-6 w-6" />
-                          <div>
-                            <h3 className="font-semibold">Questions Locked</h3>
-                            <p className="text-sm">Questions cannot be modified after the quiz has started.</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-[#e0e0e0]">Available Questions</h3>
-                        {selectedQuestions.length > 0 && (
-                          <Button
-                            onClick={handleAddQuestions}
-                            disabled={isSubmitting}
-                            className="bg-[#b388ff] hover:bg-[#9c5cff] text-white"
-                          >
-                            {isSubmitting ? 'Adding...' : `Add ${selectedQuestions.length} Questions`}
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Search and Filters */}
-                      <Card className="bg-[#242b3d] border-purple-500/20">
-                        <CardContent className="p-4">
-                          <div className="flex flex-col lg:flex-row gap-4">
-                            <div className="relative flex-1">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <Input
-                                placeholder="Search questions..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 bg-[#1a1f2e] border-purple-500/20 text-[#e0e0e0]"
-                              />
-                            </div>
-                            
-                            <div className="flex gap-2">
-                              <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                className="px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0] text-sm"
-                              >
-                                <option value="all">All Questions</option>
-                                <option value="my">My Questions</option>
-                                <option value="public">Public Questions</option>
-                              </select>
-
-                              <select
-                                value={categoryFilter}
-                                onChange={(e) => setCategoryFilter(e.target.value)}
-                                className="px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0] text-sm"
-                              >
-                                <option value="">All Categories</option>
-                                {CATEGORIES.map(cat => (
-                                  <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                              </select>
-
-                              <select
-                                value={difficultyFilter}
-                                onChange={(e) => setDifficultyFilter(e.target.value)}
-                                className="px-3 py-2 bg-[#1a1f2e] border border-purple-500/20 rounded-md text-[#e0e0e0] text-sm"
-                              >
-                                <option value="">All Difficulties</option>
-                                <option value="easy">Easy</option>
-                                <option value="medium">Medium</option>
-                                <option value="hard">Hard</option>
-                              </select>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Questions List */}
-                      {availableQuestions.length === 0 ? (
-                        <Card className="bg-[#242b3d] border-purple-500/20">
-                          <CardContent className="py-8 text-center">
-                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400 opacity-50" />
-                            <h3 className="text-lg font-medium text-[#e0e0e0] mb-2">No questions found</h3>
-                            <p className="text-gray-400">Try adjusting your filters or create new questions</p>
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        <div className="space-y-3">
-                          {availableQuestions.map((question) => (
-                            <Card 
-                              key={question.id} 
-                              className={`bg-[#242b3d] border-purple-500/20 cursor-pointer transition-colors ${
-                                selectedQuestions.includes(question.id) ? 'ring-2 ring-[#b388ff]' : 'hover:border-purple-500/40'
-                              }`}
-                              onClick={() => {
-                                setSelectedQuestions(prev => 
-                                  prev.includes(question.id) 
-                                    ? prev.filter(id => id !== question.id)
-                                    : [...prev, question.id]
-                                )
-                              }}
-                            >
-                              <CardContent className="p-4">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                      <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${
-                                        selectedQuestions.includes(question.id)
-                                          ? 'bg-[#b388ff] border-[#b388ff] text-white'
-                                          : 'border-gray-500'
-                                      }`}>
-                                        {selectedQuestions.includes(question.id) && <CheckCircle2 className="h-4 w-4" />}
-                                      </div>
-                                      <h4 className="font-medium text-[#e0e0e0]">{question.title}</h4>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-3 ml-9">{question.content}</p>
-                                    <div className="flex items-center gap-4 ml-9">
-                                      <Badge className={getDifficultyColor(question.difficulty)}>
-                                        {question.difficulty}
-                                      </Badge>
-                                      <Badge variant="outline" className="text-[#e0e0e0] border-gray-500/30">
-                                        {question.category}
-                                      </Badge>
-                                      <span className="text-xs text-gray-400">By {question.creatorName}</span>
-                                      <div className="flex items-center gap-1 text-xs text-gray-400">
-                                        <Clock className="h-3 w-3" />
-                                        {question.timeLimit || 30}s
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
           </TabsContent>
 
           {/* Analytics Tab */}
@@ -1508,26 +863,30 @@ export default function RoomManagePage() {
               </CardHeader>
               <CardContent>
                 {room.status === 'completed' ? (
-                  <div className="space-y-6">
+                  <div className="space-y-8">
+                    {/* Performance Overview */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="text-center">
+                      <div className="text-center p-6 bg-[#1a1f2e] rounded-lg">
+                        <TrendingUp className="h-8 w-8 text-[#b388ff] mx-auto mb-3" />
                         <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.averageScore}%</p>
                         <p className="text-gray-400">Average Score</p>
                       </div>
-                      <div className="text-center">
+                      <div className="text-center p-6 bg-[#1a1f2e] rounded-lg">
+                        <Target className="h-8 w-8 text-green-400 mx-auto mb-3" />
                         <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.completionRate}%</p>
                         <p className="text-gray-400">Completion Rate</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-[#e0e0e0]">{room.statistics.totalQuestions}</p>
-                        <p className="text-gray-400">Total Questions</p>
+                      <div className="text-center p-6 bg-[#1a1f2e] rounded-lg">
+                        <Users className="h-8 w-8 text-blue-400 mx-auto mb-3" />
+                        <p className="text-3xl font-bold text-[#e0e0e0]">{room.currentParticipants}</p>
+                        <p className="text-gray-400">Total Participants</p>
                       </div>
                     </div>
                     
                     <div className="text-center">
                       <Button
                         onClick={() => router.push(`/rooms/${roomId}/results`)}
-                        className="bg-[#b388ff] hover:bg-[#9c5cff]"
+                        className="bg-[#b388ff] hover:bg-[#9c5cff] px-8"
                       >
                         <BarChart3 className="h-4 w-4 mr-2" />
                         View Detailed Results
@@ -1535,10 +894,10 @@ export default function RoomManagePage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-400">
+                  <div className="text-center py-12 text-gray-400">
                     <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">Analytics available after quiz completion</h3>
-                    <p>Detailed analytics will be shown here once the quiz is completed</p>
+                    <h3 className="text-lg font-medium mb-2">Analytics Available After Completion</h3>
+                    <p>Detailed analytics and insights will be shown here once the quiz is completed</p>
                   </div>
                 )}
               </CardContent>
@@ -1546,40 +905,37 @@ export default function RoomManagePage() {
           </TabsContent>
         </Tabs>
 
-        {/* Delete Confirmation Modal */}
+        {/* Delete Confirmation Dialog */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-md bg-[#242b3d] border-red-500/20">
-              <CardHeader>
-                <CardTitle className="text-xl text-red-400 flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#242b3d] rounded-xl p-6 max-w-md w-full border border-red-500/20">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-400" />
+                <h3 className="text-xl font-semibold text-red-400">Delete Room</h3>
+              </div>
+              <p className="text-[#e0e0e0] mb-6">
+                Are you sure you want to delete this room? This action cannot be undone and will remove all associated data including participants and results.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  variant="outline"
+                  className="flex-1 border-gray-500/30 text-[#e0e0e0]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    // Handle delete room
+                    alert('Room deletion functionality will be implemented')
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                >
                   Delete Room
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-[#e0e0e0]">
-                  Are you sure you want to delete this room? This action cannot be undone and will remove all associated data.
-                </p>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    variant="outline"
-                    className="flex-1 border-gray-500/30 text-[#e0e0e0]"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowDeleteConfirm(false)
-                      deleteRoom()
-                    }}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    Delete Room
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </main>

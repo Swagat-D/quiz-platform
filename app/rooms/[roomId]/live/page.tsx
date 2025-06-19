@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/rooms/[roomId]/live/page.tsx
 'use client'
 
@@ -33,7 +35,7 @@ interface Room {
 export default function LiveRoomPage() {
   const params = useParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  useSession()
   const roomId = params?.roomId as string
 
   const [room, setRoom] = useState<Room | null>(null)

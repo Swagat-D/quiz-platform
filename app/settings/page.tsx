@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Bell, Moon, Sun, Volume2 } from 'lucide-react'
 import Navbar from '@/components/navbar'
-import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -15,7 +14,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-[#1a1f2e]">
-      <Navbar showBack />
+      <Navbar />
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto">
           <Card className="bg-[#242b3d] border-purple-500/20">

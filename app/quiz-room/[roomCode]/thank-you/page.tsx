@@ -1,55 +1,48 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Star } from 'lucide-react'
+import { useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 
 export default function ThankYouPage() {
   const router = useRouter()
-  const [rating, setRating] = useState(0)
+  const params = useParams()
+  const roomCode = params?.roomCode as string
 
-  const handleRate = (selectedRating: number) => {
-    setRating(selectedRating)
-    // Here you would typically send the rating to your backend
-    console.log('Rating submitted:', selectedRating)
-    setTimeout(() => router.push('/dashboard'), 1000) // Redirect after a short delay
-  }
+  // This page should redirect to the proper room results
+  // The thank you modal should be shown from the quiz completion instead
+  useEffect(() => {
+    // Try to find the room by code and redirect to proper results
+    const findRoomAndRedirect = async () => {
+      try {
+        const response = await fetch(`/api/rooms/code/${roomCode}`)
+        const data = await response.json()
+        
+        if (data.success) {
+          router.push(`/rooms/${data.room.id}/results`)
+        } else {
+          // If room not found, redirect to dashboard
+          router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('Failed to find room:', error)
+        router.push('/dashboard')
+      }
+    }
 
-  const handleSkip = () => {
-    router.push('/dashboard')
-  }
+    if (roomCode) {
+      findRoomAndRedirect()
+    } else {
+      router.push('/dashboard')
+    }
+  }, [roomCode, router])
 
+  // Show a loading state while redirecting
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-md bg-[#242b3d] border-purple-500/20">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center text-[#b388ff]">Thank You!</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <p className="text-center text-[#e0e0e0]">We appreciate your participation in the quiz. How would you rate your experience?</p>
-          <div className="flex justify-center space-x-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Star
-                key={star}
-                className={`h-8 w-8 cursor-pointer transition-all duration-200 ${
-                  star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'
-                }`}
-                onClick={() => handleRate(star)}
-              />
-            ))}
-          </div>
-          <Button
-            onClick={handleSkip}
-            variant="ghost"
-            className="w-full text-[#b388ff] hover:text-purple-400 hover:bg-purple-500/10 transition-colors duration-200"
-          >
-            Skip Rating
-          </Button>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen bg-[#1a1f2e] flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-2 border-[#b388ff] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-[#e0e0e0]">Redirecting to results...</p>
+      </div>
     </div>
   )
 }
-

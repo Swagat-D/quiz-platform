@@ -8,7 +8,7 @@ interface SettingsSubpageProps {
   onClose: () => void;
 }
 
-export function SettingsSubpage({ onClose }: SettingsSubpageProps) {
+export function SettingsSubpage({ }: SettingsSubpageProps) {
   const [darkMode, setDarkMode] = useState(true)
   const [notifications, setNotifications] = useState(true)
   const [sound, setSound] = useState(true)

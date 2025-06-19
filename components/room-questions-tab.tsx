@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // components/room-questions-tab.tsx
 'use client'
 
@@ -6,13 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
-  Plus, Search, X, CheckCircle2, BookOpen, Edit, Trash2, 
-  ArrowUp, ArrowDown, Clock, Award
+  Plus, Search, CheckCircle2, BookOpen,  Trash2, 
+   Clock, Award
 } from 'lucide-react'
 import {
   Dialog,
@@ -253,7 +254,10 @@ export function RoomQuestionsTab({ roomId, roomStatus, onQuestionsChange }: Room
     })
   }
 
-  const updateFormField = (field: string, value: any) => {
+  const updateFormField = (
+    field: keyof typeof formData,
+    value: string | number | boolean
+  ) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 

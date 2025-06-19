@@ -1,4 +1,3 @@
-import { ObjectId } from 'mongodb';
 import { getDb } from './mongodb';
 
 // Generate a random 6-digit OTP
